@@ -1,0 +1,2 @@
+# LegionFanControl
+Legion Fan Control
