@@ -758,6 +758,31 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     规则：**FXML 里新增任何控件或布局类，都要同步加进生成器的 `FXML_UI_CLASSES`**，
     否则原生包会在启动时倒在这一步（JVM 模式不受影响，因为类路径上什么都有）。
 
+21. **JavaFX 会在运行期动态生成 `Trampoline` → 与 native-image「禁止运行期定义类」冲突（2026-10-12）**。
+    FXML 登记齐了之后，下一层是 JavaFX 自己的反射实现：它在反射调用某些成员时，会**在运行期生成**
+    `com.sun.javafx.reflect.Trampoline` 来绕过模块访问限制；而 native-image 默认不允许运行期定义类。
+
+    | 现象 | 原因 | 处置 |
+    |---|---|---|
+    | `UnsupportedFeatureError: Classes cannot be defined at runtime by default … Tried to define class 'com.sun.javafx.reflect.Trampoline'` | 运行期生成 Trampoline | **预定义该类**（本条目） |
+    | 紧接着 `Fatal error: Unable to call AOT method: … ClassLoader.getPlatformClassLoader` + `com.oracle.svm.interpreter.InterpreterUtil.shouldNotReachHere`（`EXCEPTION_ACCESS_VIOLATION`） | 试过 `-H:+RuntimeClassLoading`（错误文案里 “by default” 的那个开关，隐含 **open world**）：open world 与解释器混用在 GraalVM 25 上不稳 | **已证伪，不要再用**：exe 102.2 → 156.9 MB、native-image 4m56s → 6m28s，随后仍崩溃 |
+
+    定点解法：用 tracing agent 采集运行期定义的类，再预定义进镜像。
+
+    | 步骤 | 做法 |
+    |---|---|
+    | 采集 | `.github/workflows/CollectPredefinedClasses.yml`（手动 / push 限定文件触发）：只构建 fat jar，用 `Script/FxmlLoadProbe.java` 装载一次 FXML 后**优雅退出** |
+    | 三个必备条件 | ① 用 `-agentpath:` 显式指 agent 动态库（`-agentlib:` 在 Windows 上找不到库）；② 加 `--add-opens java.base/java.lang=ALL-UNNAMED` —— JVM 上 JavaFX 的 `defineClass` 会被模块访问挡住，**不加就采不到**；③ 必须优雅退出（agent 在关闭钩子里落盘，强杀进程会丢结果） |
+    | 入库 | `predefined-classes-config.json` + `<hash>.classdata` 放进 `src/main/resources/META-INF/native-image/`（两者是同一次采集的一对，native-image 按文件名自动识别） |
+    | 规则 | 这两个文件是**采集产物**，不得手改；要更新就重跑采集作业，把新产物整体替换 |
+
+    > **只取定点所需的两个文件**：agent 同一次运行还产出了 120 KB 的 `reachability-metadata.json`，
+    > **不入库** —— 本项目已有手写 + 生成器维护的三份元数据，混入采集品会让「元数据来源」这条线失焦。
+    >
+    > 采集结果（2026-10-12，GraalVM 25.4 / JDK 25）：清单 1 项
+    > （`com/sun/javafx/reflect/Trampoline`，hash `h4Emrly5Eh7pTrttmQosxK`），字节 1566。
+
+
 ---
 
 ## 6. 排查手册
