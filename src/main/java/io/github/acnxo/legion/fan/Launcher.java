@@ -23,8 +23,12 @@ import java.util.List;
  * {@link NativeImageRenderDefaults}。该调用必须早于任何 JavaFX / Prism 类初始化，
  * 故置于本方法的第一条语句。
  *
- * <p><b>4. 隐藏双击自带的控制台窗口</b>：原生包是控制台子系统程序，双击时 Windows 会先开一个黑框。
- * 详见 {@link ConsoleWindow} —— 只隐藏「本进程独占的那一个」，由 cmd / `Dist\*.cmd` 启动时一律保持可见。
+ * <p><b>4. 控制台窗口（默认不创建）</b>：原生包以 <b>GUI 子系统</b> 链接（pom 的
+ * {@code /SUBSYSTEM:WINDOWS}），Windows <b>不会</b>为它创建控制台窗口 —— 双击、右键「以管理员身份运行」
+ * 都只有界面，也不存在「先弹黑框再消失」的一闪（这是链接期定下的，与运行时调用无关）。
+ * 需要日志时用 {@code --console} / {@code -Dlegion.console=true} 显式取得控制台；
+ * 从 cmd / PowerShell 启动时日志打在<b>启动者</b>的窗口里，那个窗口不属于本进程，绝不隐藏、不乱动。
+ * 详见 {@link ConsoleWindow}。
  */
 public final class Launcher {
 
@@ -32,8 +36,8 @@ public final class Launcher {
     }
 
     public static void main(String[] args) {
-        // 双击原生包时隐藏自带控制台窗口；从 cmd / Dist 脚本启动时保持可见（见 ConsoleWindow）。
-        // 放在最前面：越早隐藏，双击时的一闪越短。
+        // 控制台：原生包以 GUI 子系统链接，默认根本没有控制台窗口（不是“隐藏”）；需要日志时用 --console。
+        // 放在最前面：--console 分配控制台要早于任何输出与 JavaFX 初始化，否则早期日志会丢。
         ConsoleWindow.applyStartupVisibility(args);
 
         // 临时缓解措施（issue #48，非最终方案）：原生镜像内默认关闭 LCD 次像素合成。
