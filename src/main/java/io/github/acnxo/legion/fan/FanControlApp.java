@@ -93,7 +93,8 @@ public class FanControlApp extends Application {
     private boolean elevated;
 
     public static void main(String[] args) {
-        // 双击原生包时隐藏自带控制台窗口（从 cmd / Dist 脚本启动时保持可见，见 ConsoleWindow）
+        // 控制台：原生包以 GUI 子系统链接，默认根本没有控制台窗口（不是“隐藏”）；需要日志时用 --console。
+        // 放在最前面：--console 分配控制台要早于任何输出与 JavaFX 初始化，否则早期日志会丢。
         ConsoleWindow.applyStartupVisibility(args);
 
         // 临时缓解措施（issue #48，非最终方案）：原生镜像内默认关闭 LCD 次像素合成；lcdEnabled
