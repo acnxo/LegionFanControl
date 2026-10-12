@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.acnxo</groupId>
+    <artifactId>legion-fan-control</artifactId>
+    <version>0.5.0</version>
+    <packaging>jar</packaging>
+    <name>legion-fan-control</name>
+    <description>联想拯救者笔记本风扇控制工具</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- 2026-09-27 决策：基线仅使用 Java 25 + OpenJFX（JVM 运行）。
+             2026-10-10 更新：原生镜像方向由用户重启，工具链定为官方 GraalVM
+             （native-maven-plugin），明确不引入 Gluon / gluonfx；
+             原生编译收敛在 native-image profile 内，默认 jar 打包不受影响。 -->
+        <maven.compiler.release>25</maven.compiler.release>
+        <javafx.version>27</javafx.version>
+        <!-- 第三方构件的版本一律集中在此处定义，并在 dependencies / build / profiles 里用
+             ${...} 引用：版本只有单一来源，升级时只改这里。
+             pom.xml 里任何 dependency / plugin 直接写死版本，都会被
+             Script/CheckPomVersions.py 挡下（开发约定第 11 条）。 -->
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+        <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+        <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
+        <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
+        <native-maven-plugin.version>1.1.14</native-maven-plugin.version>
+        <!-- 入口必须是不继承 javafx.application.Application 的普通类。
+             若把继承 Application 的类直接作为 Main-Class，Java 启动器会强制
+             走模块化 JavaFX 运行时检查，非模块化 jar 将报「缺少 JavaFX 运行时组件」。 -->
+        <mainClass>io.github.acnxo.legion.fan.Launcher</mainClass>
+    </properties>
+
+    <dependencies>
+        <!--
+            JavaFX 依赖显式指定 win 分类器（本项目 Windows 定向）：
+              1. 无分类器写法会解析出「空 meta jar + win jar」共 6 个构件 —— meta jar 仅 306 字节、
+                 无任何内容，只是靠父 POM 的 OS 属性 ${javafx.platform} 转引同坐标 win 构件；
+              2. win 分类器构件的 POM 没有传递依赖，因此 base / graphics / controls
+                 三个模块必须逐一显式声明（只给 controls 指定会导致 graphics、base 缺失）；
+              3. 效果：classpath 构件数 6 → 3，去掉全部空 meta jar，shade 合并输入更干净；
+              4. 代价：本配置不适用于非 Windows 环境（Linux/macOS 需换成对应 classifier）。
+        -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+            <exclusions>
+                <!-- controls 的 POM 会传递拉入 graphics 的空 meta jar，排除后由下方 win 声明接管 -->
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-graphics</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+            <exclusions>
+                <!-- 同理：排除 graphics POM 传递拉入的 base 空 meta jar -->
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-base</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+        <!--
+            界面重构后引入：FXML 装载器（界面结构 / 样式从 Java 代码中拆出去，见 FanControlView.fxml / .css）。
+            与上面三个模块同规：显式指定 win 分类器，并排除 POM 传递拉入的空 meta jar
+            （base / graphics / controls 已在本文件逐一显式声明）。
+        -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-base</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-graphics</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-controls</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <!--
+            产物名固定为 LegionFanControl.jar（不带版本号）。
+            理由：本项目不发布到 Maven 仓库，产物只在本机使用；
+            固定名让 Dist 归档与 Bootstrap.cmd 启动脚本都无需做版本号匹配，
+            升级 version 时产物名不变，脚本零改动。
+            注意：本文件中的 ${project.build.finalName} 会自动取此值。
+        -->
+        <finalName>LegionFanControl</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+            </plugin>
+            <!-- JVM 模式调试运行：mvn javafx:run（需管理员终端） -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>${javafx-maven-plugin.version}</version>
+                <configuration>
+                    <mainClass>${mainClass}</mainClass>
+                </configuration>
+            </plugin>
+            <!--
+                打可直接运行的 jar（fat jar）：把 JavaFX 的类与 native 库一并打进
+                单个 jar，从而支持 java -jar 直接启动，无需额外配置模块路径。
+
+                注意：
+                  1. JavaFX 的 native 库（glass.dll / prism_d3d.dll 等）位于各
+                     -win.jar 内，shade 时需一并解包合并，因此关闭
+                     createDependencyReducedPom 之外，还要用 ServicesResourceTransformer
+                     合并 META-INF/services；
+                  2. 必须排除 module-info.class（含 META-INF/versions 下的），否则 fat jar
+                     在 classpath 模式下会因模块描述冲突而启动失败；
+                  3. 主类为 Launcher（普通类），它再转发到 FanControlApp.main，
+                     避免 Java 启动器的模块化 JavaFX 检查。
+
+                构建：mvn clean package
+                产物：target/LegionFanControl.jar（文件名由 build/finalName 决定）
+                运行：java（空格）enable-native-access=ALL-UNNAMED，再接 -jar 与 jar 路径
+                     （需管理员终端；该开关用于消除 JavaFX native 库加载时的
+                      受限方法警告，是纯非模块化 jar 场景下的建议写法）
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven-shade-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/versions/*/module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${mainClass}</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                打包产物归档：把 shade 生成的 fat jar 复制到项目根下的 Dist 目录。
+
+                要点：
+                  1. 使用 maven-resources-plugin 的 copy-resources（Maven 默认生命周期
+                     自带该插件，无需额外下载依赖）；
+                  2. 本 execution 声明在 shade 之后，同一 package 阶段内按声明顺序执行，
+                     因此复制到的一定是「合并完成后」的 fat jar，而非 shade 前的原始 jar；
+                  3. 文件名取自 project.build.finalName，即 LegionFanControl.jar ——
+                     不含版本号，升级 version 时本段配置与启动脚本均无需改动；
+                  4. 只匹配该 jar 本身，不会带上 original- 前缀的 shade 中间产物。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>${maven-resources-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>copy-fat-jar-to-dist</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.basedir}/Dist</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.build.directory}</directory>
+                                    <includes>
+                                        <include>${project.build.finalName}.jar</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!--
+        原生镜像构建 profile（与默认 jar 打包完全区隔）：
+          1. 仅在显式 -Pnative-image 时生效；默认 mvn clean package 行为不变，
+             原生编译失败不影响 jar 打包（失败只会让本次 -P 构建失败）；
+          2. 工具链为官方 GraalVM（org.graalvm.buildtools:native-maven-plugin），
+             不引入 Gluon / gluonfx（2026-10-10 用户决策：禁止 gluonfx）；
+          3. 目标平台 Windows x64，产物 target/LegionFanControl.exe（不带版本号）；
+          4. 反射 / JNI / 资源配置放在 src/main/resources/META-INF/native-image/
+             下（native-image 会从类路径自动发现，无需额外传参）；
+          5. JavaFX 原生 DLL（glass.dll / prism_*.dll / javafx_font.dll 等）**作为资源编进镜像**，
+             因此发布包里只有一个 exe（自包含）。机理：原生镜像下 OpenJFX 的 NativeLibLoader
+             既拿不到 jar 相对路径、也命中不了 java.library.path，唯一可行通路是
+             loadLibraryFromResource() —— 它把类路径根部的 /<libname>.dll 解到
+             ~/.openjfx/cache/ 下再 System.load。所以 DLL 必须被 resource-config.json 的
+             扩展名规则纳入镜像（详见 Docs/NativeImageCi.md）；
+          6. 构建前提：JAVA_HOME 指向 GraalVM JDK 25（含 native-image），
+             Windows 上还需 MSVC 工具链环境（CI 用 ilammy/msvc-dev-cmd 配置）。
+             本地命令：mvn -Pnative-image -DskipTests clean package
+    -->
+    <profiles>
+        <profile>
+            <id>native-image</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>${native-maven-plugin.version}</version>
+                        <configuration>
+                            <mainClass>${mainClass}</mainClass>
+                            <imageName>LegionFanControl</imageName>
+                            <buildArgs>
+                                <!-- 必须先解锁实验选项：下面用到的 -H:ExcludeResources 属于 experimental 参数
+                                     （只出现在 expert-options 列表里），而 GraalVM 按**参数顺序**判定是否已解锁，
+                                     放在后面会被判为「未解锁」。 -->
+                                <arg>-H:+UnlockExperimentalVMOptions</arg>
+                                <!-- 注意：原先的 no-fallback 开关已删除。GraalVM 现已取消 fallback 机制，
+                                     该开关在 25.4 上会产生 deprecated / no effect / no replacement 告警；
+                                     删后行为不变（编不出镜像依旧直接失败）。 -->
+                                <!-- 构建报告：直接产出可读的构建报告，便于事后核对
+                                     类初始化、可达性与资源收录情况（issue #20 归因用）。 -->
+                                <arg>--emit</arg>
+                                <arg>build-report</arg>
+                                <!-- 固定为兼容指令集，产物不随构建机指令集优化，任意 x64 机器可运行 -->
+                                <arg>-march=compatibility</arg>
+                                <!-- 构建期异常带栈：否则报错往往只有一个类名，定位得重新猜一遍 -->
+                                <arg>-H:+ReportExceptionStackTraces</arg>
+                                <!-- 带上全部字符集：Windows 的 sun.jnu.encoding 是**代码页**（中文 Windows 为
+                                     GBK），而镜像默认只带少量字符集。sun.nio.fs.Util / ProcessImpl
+                                     这类类的静态初始化会去 Charset.forName(sun.jnu.encoding)，
+                                     缺字符集就在运行期抛 UnsupportedCharsetException → 类初始化失败，
+                                     连带 NativeLibLoader 的第①条路径中断、原生库永远加载不到 ——
+                                     最终表现为「两条 Prism 管线都起不来」（详见第 5 节第 13 条）。 -->
+                                <arg>-H:+AddAllCharsets</arg>
+
+                                <!-- Windows exe 清单：没有它，进程被判为「DPI 不感知」
+                                     （整窗位图放大 → 字体发虚），且 Windows 会谎报系统版本
+                                     （原生包日志打 "Windows 8.0 build 9200"，JVM 模式是
+                                     "Windows version 10.0 build 26300"）。
+                                     清单本体：exe.manifest（仓库根）。
+                                     构建后由工作流自证④从 exe 字节里复查。 -->
+                                <arg>-H:NativeLinkerOption=/MANIFEST:EMBED</arg>
+                                <arg>-H:NativeLinkerOption=/MANIFESTINPUT:${project.basedir}/exe.manifest</arg>
+
+                                <!-- 程序图标：exe.res 由 rc.exe 编译 exe.rc（引用 exe.ico）得到，
+                                     见工作流的 CompileAppIconResource 步骤；没有它，exe 在资源管理器
+                                     与任务栏里显示为默认白纸图标。exe.res 不入库（构建产物）。 -->
+                                <arg>-H:NativeLinkerOption=${project.basedir}/exe.res</arg>
+
+                                <!-- 以 GUI 子系统链接：**彻底不创建控制台窗口**。
+                                     控制台子系统的 exe，双击与右键「以管理员身份运行」都会先弹一个黑框；
+                                     “启动后再隐藏”只能事后补救（还要看 FFM 调用与判定是否成立，实测不达标），
+                                     所以直接不创建。入口点必须显式指定为 mainCRTStartup：镜像的 C 入口是 main，
+                                     而 /SUBSYSTEM:WINDOWS 默认去找 WinMain。
+                                     注：这样一来从命令行运行时，cmd 不会“等”这个 GUI 程序结束（需要等待用 start /wait）；
+                                     stdout 依旧由启动者提供，日志照旧可见。 -->
+                                <arg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</arg>
+                                <arg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</arg>
+                                <!-- 提前采用未来版本的默认行为：等于给「为更高 JDK 铺路」做早期预警，
+                                     哪天编不过了那就是升级信号，而不是默默地出产物 -->
+                                <arg>--future-defaults=all</arg>
+
+                                <!-- 以下参数是「产出的 exe 真能跑起来」的必需项，
+                                     缺任何一项都会得到一个构建成功但运行即崩的包。
+                                     （资源侧的对应项——把 DLL 纳入镜像——在
+                                     src/main/resources/META-INF/native-image/resource-config.json） -->
+
+                                <!-- 消掉 JDK 25 对 System.load / System.loadLibrary 的受限方法警告 -->
+                                <arg>--enable-native-access=ALL-UNNAMED</arg>
+
+                                <!-- JavaFX 的入口 / 工具包 / 字体 / 管线 / 日志一律在运行期初始化：
+                                     它们大量读取系统属性与运行环境，构建期初始化会把构建机的取值固化进镜像 -->
+                                <arg>--initialize-at-run-time=com.sun.javafx.application.PlatformImpl</arg>
+                                <arg>--initialize-at-run-time=com.sun.javafx.application.LauncherImpl</arg>
+                                <arg>--initialize-at-run-time=com.sun.javafx.logging.PlatformLogger</arg>
+                                <arg>--initialize-at-run-time=com.sun.javafx.util.Utils</arg>
+                                <arg>--initialize-at-run-time=com.sun.javafx.font</arg>
+                                <arg>--initialize-at-run-time=com.sun.glass.ui</arg>
+                                <arg>--initialize-at-run-time=com.sun.glass.utils.NativeLibLoader</arg>
+                                <arg>--initialize-at-run-time=com.sun.prism</arg>
+                                <arg>--initialize-at-run-time=com.sun.scenario.animation</arg>
+                                <!-- 文本排版 / 字形缓存（PrismTextLayout、TextLayout 等）。
+                                     原先漏在列表外：这一层持有排版与字形的缓存，
+                                     一旦被构建期初始化，缓存与默认值就会被固化进镜像。
+                                     issue #20 归因审计的第一个缺口，故补上。 -->
+                                <arg>--initialize-at-run-time=com.sun.javafx.text</arg>
+                                <arg>--initialize-at-run-time=com.sun.javafx.scene.text</arg>
+                                <!-- 归因审计：打印「哪些类被在构建期初始化」。
+                                     只影响构建日志，不改产物行为。
+                                     日志由工作流保留，可直接判定是否存在构建期固化。 -->
+                                <arg>-H:+PrintClassInitialization</arg>
+                            </buildArgs>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

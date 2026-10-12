@@ -1,0 +1,5 @@
+﻿case1: Data=2500 scalar
+  cast [int]: 2500
+case2 ERR: Cannot convert the "@{Value=2500}" value of type "System.Management.Automation.PSCustomObject" to type "System.Int32".
+case3: Data=null -> [int] = 0
+--- CimMethodResult 的属性 ---

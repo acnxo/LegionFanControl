@@ -1,0 +1,77 @@
+name: CheckScriptLineEndings
+
+# 脚本行尾自证（自包含，不依赖其它仓库）
+#
+# 为什么需要：行尾约定只写在文档里挡不住编辑器 / sed / 批量改写 —— 一旦 .cmd 变成 LF，
+# cmd.exe 读取含中文的行会**位置漂移**，后续行被当成命令执行。
+# 本仓库的主体代码尚未迁入，此护栏先立起来：迁移进来的第一天就受保护。
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 校验脚本行尾与 BOM
+        run: |
+          set -euo pipefail
+          fail=0
+
+          # ① 字节级：.cmd / .bat 必须是纯 CRLF（每个 LF 前都有 CR），且不得带 UTF-8 BOM
+          for f in $(git ls-files '*.cmd' '*.bat' || true); do
+            lf=$(tr -cd '\n' < "$f" | wc -c | tr -d ' ')
+            cr=$(tr -cd '\r' < "$f" | wc -c | tr -d ' ')
+            if [ "$lf" != "$cr" ]; then
+              echo "::error file=$f::$f 行尾不是纯 CRLF（LF=$lf，CR=$cr）"
+              fail=1
+            fi
+            bom=$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')
+            if [ "$bom" = "efbbbf" ]; then
+              echo "::error file=$f::$f 含 UTF-8 BOM（.cmd 不得带 BOM）"
+              fail=1
+            fi
+          done
+
+          # ② 字节级：.ps1 约定 LF
+          for f in $(git ls-files '*.ps1' || true); do
+            if [ "$(tr -cd '\r' < "$f" | wc -c | tr -d ' ')" != "0" ]; then
+              echo "::error file=$f::$f 含 CR（.ps1 约定 LF）"
+              fail=1
+            fi
+          done
+
+          # ③ 属性级：签出行尾必须由 .gitattributes 强制，否则换台机器就会漂回去
+          while IFS= read -r line; do
+            case "$line" in
+              *.cmd|*.bat)
+                # 属性是核心保障：缺了 eol=crlf，任何人都可能签出成 LF
+                case "$line" in
+                  *eol=crlf*) ;;
+                  *) echo "::error::$line 缺少 text eol=crlf 属性"; fail=1 ;;
+                esac
+                # w/none：git 视其为非文本（例如空文件、或整文件没有换行符）——
+                # 这类文件不会出现「行被读错位」，且上面的字节检查已确保 LF 与 CR 相等
+                case "$line" in
+                  *w/crlf*|*w/none*) ;;
+                  *) echo "::error::$line 工作区行尾不是 CRLF"; fail=1 ;;
+                esac ;;
+              *.ps1)
+                # w/none 指 git 视其为非文本（例如整文件没有换行符），这类不做行尾要求
+                case "$line" in
+                  *w/lf*|*w/none*) ;;
+                  *) echo "::error::$line 工作区行尾不是 LF"; fail=1 ;;
+                esac ;;
+            esac
+          done < <(git ls-files --eol -- '*.cmd' '*.bat' '*.ps1' || true)
+
+          if [ "$fail" != "0" ]; then
+            echo '::error::脚本行尾约定被破坏：.cmd / .bat 必须 CRLF、.ps1 必须 LF'
+            echo '修复：把文件存成 CRLF（或 .ps1 存成 LF），然后 git add --renormalize -- "*.cmd" 归一化索引'
+            exit 1
+          fi
+          echo "行尾自证通过：.cmd / .bat 全为 CRLF 且无 BOM，.ps1 全为 LF ✓"

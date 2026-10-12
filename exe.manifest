@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  LegionFanControl 原生镜像 exe 的 Windows 清单（manifest）。
+
+  为什么必须有它（2026-10-10 真机定位，详见 Docs/NativeImageCi.md 第 5 节第 15 条）：
+  原生镜像产出的 exe 原先**完全没有清单**，由此产生两个后果：
+
+    1. 进程被判为「DPI 不感知」—— Windows 会把整窗按显示缩放做位图放大；
+       字形是按 96 DPI 栅格化的，放大后就是「发虚、笔画偏细」；
+    2. Windows 对无清单的进程**谎报系统版本**：原生包启动日志打的是
+       "OS Information: Windows 8.0 build 9200"，
+       而 JVM 模式（java.exe 自带清单）打的是 "Windows version 10.0 build 26300"。
+       —— 这行日志一眼就能判定清单在不在，是最好的验收断言。
+
+  字体那一侧（DirectWrite 工厂 / Subpixel / 字体枚举）两种模式实测逐字相同，
+  所以差异不在字体栅格化，只在清单。
+
+  嵌入方式：pom 的 native-image profile 通过下面两条交给 MSVC 链接器
+    -H:NativeLinkerOption=/MANIFEST:EMBED
+    -H:NativeLinkerOption=/MANIFESTINPUT:<本文件绝对路径>
+  构建后由工作流的自证④从 exe 字节里复查（ASCII / UTF-16 两种编码都查）。
+
+  注意：本文件必须是 UTF-8 且**不带 BOM**，否则清单嵌入可能失败。
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="LegionFanControl" version="1.0.0.0" processorArchitecture="amd64"/>
+
+  <!-- 声明支持的系统版本：缺了这一段，Windows 会统一谎报 6.2 / build 9200，
+       进而让版本相关的代码分支（如 Win8.1+ 才用的 DPI 接口）走旧路径。 -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/> <!-- Windows 10 / 11 -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/> <!-- Windows 8.1 -->
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/> <!-- Windows 8 -->
+      <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/> <!-- Windows 7 -->
+    </application>
+  </compatibility>
+
+  <!-- 普通权限启动：提权由程序自己申请（Elevation.relaunchElevatedIfNeeded），行为不变 -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <!-- DPI 感知：true = 系统级。刻意与 java.exe（JVM 模式，实测清晰的那一侧）对齐。
+       若将来要支持「混合 DPI 的多显示器」，再改成 true/pm 并补
+       dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings" = PerMonitorV2，
+       改完必须重新做一次 JVM / 原生的对照验证。 -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+    </windowsSettings>
+  </application>
+</assembly>

@@ -1,0 +1,14 @@
+User=<已隐去>
+IsAdmin=False
+
+=== LENOVO_GAMEZONE_DATA instances ===
+ERR: Access denied 
+
+=== LENOVO_FAN_METHOD instances ===
+ERR: Access denied 
+
+=== LENOVO_FAN_MAX_SPEED_DATA ===
+ERR: Not supported 
+
+=== LENOVO_FAN_TABLE_DATA ===
+ERR: Access denied 

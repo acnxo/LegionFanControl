@@ -1,0 +1,59 @@
+=== LENOVO_* classes in root\WMI ===
+LENOVO_AC_PD_EVENT
+Lenovo_BatteryInformation
+LENOVO_CPU_METHOD
+LENOVO_CPU_OVERCLOCKING_DATA
+LENOVO_DEFAULT_VALUE_IN_DIFFERENT_MODE_DATA
+LENOVO_FAN_MAX_SPEED_DATA
+LENOVO_FAN_METHOD
+LENOVO_FAN_TABLE_DATA
+LENOVO_GAMEZONE_CPU_OC_DATA
+LENOVO_GAMEZONE_DATA
+LENOVO_GAMEZONE_FAN_COOLING_EVENT
+LENOVO_GAMEZONE_GPU_OC_DATA
+LENOVO_GAMEZONE_GPU_TEMP_EVENT
+LENOVO_GAMEZONE_KEYLOCK_STATUS_EVENT
+LENOVO_GAMEZONE_LIGHT_PROFILE_CHANGE_EVENT
+LENOVO_GAMEZONE_OC_EVENT
+LENOVO_GAMEZONE_POWER_CHARGE_MODE_EVENT
+LENOVO_GAMEZONE_SMART_FAN_MODE_EVENT
+LENOVO_GAMEZONE_SMART_FAN_SETTING_EVENT
+LENOVO_GAMEZONE_TEMP_EVENT
+LENOVO_GAMEZONE_THERMAL_MODE_EVENT
+LENOVO_GPU_METHOD
+LENOVO_GPU_OVERCLOCKING_DATA
+LENOVO_INTELLIGENT_OP_LIST
+LENOVO_LIGHTING_DATA
+LENOVO_LIGHTING_EVENT
+LENOVO_LIGHTING_METHOD
+LENOVO_MEMORY_METHOD
+LENOVO_MEMORY_OC_DATA
+LENOVO_OTHER_METHOD
+LENOVO_PANEL_METHOD
+LENOVO_SR_DATA
+LENOVO_SR_EVENT
+Lenovo_SystemElement
+LENOVO_UTILITY_DATA
+LENOVO_UTILITY_EVENT
+
+=== IsSupportFanCooling ===
+ERR: You cannot call a method on a null-valued expression.
+
+=== GetSmartFanMode ===
+ERR: You cannot call a method on a null-valued expression.
+
+=== Fan_GetCurrentFanSpeed ===
+Fan1 ERR: You cannot call a method on a null-valued expression.
+Fan2 ERR: You cannot call a method on a null-valued expression.
+
+=== Temp sensors ===
+GetCPUTemp ERR: You cannot call a method on a null-valued expression.
+GetGPUTemp ERR: You cannot call a method on a null-valued expression.
+
+=== VBS / Memory Integrity ===
+VBS=2 (0=off 1=enabled-not-running 2=running); SecurityServicesRunning=0 (1=CredGuard 2=HVCI)
+
+=== Lenovo drivers/services ===
+EnergyDrv: not found
+LSIF: not found
+LenovoVantageService: not found

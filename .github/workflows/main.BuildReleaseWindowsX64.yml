@@ -1,0 +1,866 @@
+# 本工作流既构建**原生镜像包**，也构建并随发布一起挂出**JVM 包**，
+# 故不再叫 BuildNativeImageWindowsX64（2026-10-10 改名）。
+# 注意：内部作业 id 仍保持 `build-native-image` —— 改名会牵动 needs:/outputs 引用，没有收益。
+name: BuildReleaseWindowsX64
+
+# 触发方式：手动（调试期约定） + push 到 main（正式版与 PR 合并） / dev（开发期预发行）。
+# 注意：GitHub Actions 无法在触发层面区分「PR 合并」与「直接 push」，push 到 dev 时两者
+#       都会进来，由工作流内反查 PR 决定 tag 的编号段用 PR 号还是时间戳。
+# 原生编译失败只影响本工作流，不影响本地 / 其他渠道的默认 jar 打包。
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - dev
+  # PR 也构建一遍：原生镜像的问题（元数据缺失、参数不当、资源漏配）都只在**构建之后**才暴露。
+  # 只到合并后才构建，等于把验证推到「已经进 main」之后 —— PR #3 的产物问题就是这么漏过去的。
+  # 不会误发版本：publish 作业已用 if 排除 PR 事件。
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  build-native-image:
+    # 显示名（同时是 PR 上的 check 名）：产出 Windows x64 的两种交付物
+    name: BuildWindowsX64Packages
+    runs-on: windows-latest
+    timeout-minutes: 90
+    # 版本号由本作业的 ReadProjectVersion 解析，供发布作业拼 tag（单一来源，不重复解析）
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: SetupGraalvm
+        uses: graalvm/setup-graalvm@v1
+        with:
+          # 用「GraalVM 发行版本号」（X.Y）而不是 Java 主版本号（java-version）。
+          # 区别很大：
+          #   java-version: '25'  → 只会拉到 25 系列最新的 **Community Edition**（25.0.2），
+          #   version: '25.4'     → GraalVM 25 系列的 **innovation 发行版**（Oracle GraalVM）。
+          # 请见 https://github.com/marketplace/actions/github-action-for-graalvm 的 Quickstart。
+          version: '25.4'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: 'maven'
+
+      # Windows 上 native-image 链接依赖 MSVC 工具链，此步注入 VS 的开发环境变量
+      - name: InitMsvcToolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # 环境信息打印：排查构建失败时先看这里（JDK / native-image / Maven / MSVC 是否就绪）
+      - name: PrintEnvironmentInfo
+        shell: pwsh
+        run: |
+          Write-Host '===== 构建环境信息 ====='
+          Write-Host "JAVA_HOME = $env:JAVA_HOME"
+          Write-Host '--- java -version ---'
+          java -version 2>&1 | ForEach-Object { Write-Host $_ }
+          Write-Host '--- native-image --version ---'
+          native-image --version 2>&1 | ForEach-Object { Write-Host $_ }
+          Write-Host '--- mvn -version ---'
+          mvn -version 2>&1 | ForEach-Object { Write-Host $_ }
+          $cl = Get-Command cl.exe -ErrorAction SilentlyContinue
+          if ($cl) { Write-Host "MSVC cl.exe = $($cl.Source)" }
+          else { Write-Host 'WARNING: cl.exe 不在 PATH，native-image 链接可能失败' }
+
+      # 程序图标：把 exe.rc + exe.ico 编译成 exe.res（native-image 链接阶段会把它并进 exe）。
+      # 为何必须放在 BuildNativeImage 之前且必须成功：pom 的 native-image profile 无条件引用
+      # ${project.basedir}/exe.res，缺了它链接会直接失败 —— 所以这里失败要给出可照做的提示。
+      # rc.exe 随 Windows SDK 提供，InitMsvcToolchain（ilammy/msvc-dev-cmd）注入 VS 环境后即在 PATH。
+      # 注意：exe.res 写在仓库根（不在 target/ 下）—— BuildNativeImage 里的 mvn clean 只清 target/，
+      # 若放到 target/ 会在链接前被删掉。
+      - name: CompileAppIconResource
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Command rc.exe -ErrorAction SilentlyContinue)) {
+            throw 'rc.exe 不在 PATH —— 图标资源无法编译（它随 Windows SDK 提供；请检查 InitMsvcToolchain 是否真的注入了 VS 环境变量）'
+          }
+          if (-not (Test-Path 'exe.rc')) { throw '未找到 exe.rc（程序图标资源脚本）' }
+          if (-not (Test-Path 'exe.ico')) { throw '未找到 exe.ico（程序图标本体）' }
+          rc.exe /nologo /fo exe.res exe.rc
+          if ($LASTEXITCODE -ne 0) { throw "rc.exe 编译失败（退出码 $LASTEXITCODE）—— 看上方 rc 输出定位（常见：exe.ico 损坏 / 不是合法 ICO）" }
+          if (-not (Test-Path 'exe.res')) { throw 'rc.exe 返回成功但没有生成 exe.res' }
+          Write-Host ("自证：图标资源已生成 exe.res（{0} 字节，来自 exe.ico 的 {1} 字节）✅" -f (Get-Item 'exe.res').Length, (Get-Item 'exe.ico').Length)
+
+      # profile native-image 内的 compile-no-fork 绑定在 package 阶段：
+      # 先正常编译并打出 fat jar（供后续提取 JavaFX 原生 DLL），再产出原生镜像
+      - name: BuildNativeImage
+        shell: pwsh
+        run: |
+          Write-Host "===== 原生镜像构建开始（profile: native-image）[$(Get-Date -Format o)] ====="
+          mvn -B -ntp -Pnative-image -DskipTests clean package
+          Write-Host "===== 原生镜像构建结束 [$(Get-Date -Format o)] ====="
+          if (Test-Path 'target/LegionFanControl.exe') {
+            $exe = Get-Item 'target/LegionFanControl.exe'
+            Write-Host ("构建产物: target/LegionFanControl.exe，大小 {0:N1} MB" -f ($exe.Length / 1MB))
+          } else {
+            Write-Host 'WARNING: 构建成功但未找到 target/LegionFanControl.exe，请检查插件输出'
+          }
+
+      # 归因审计：native-image 的类初始化报告只写成 CSV，不打进日志。
+      # 这里把关心的包筛出来打到日志（便于直接判读），同时上传原始 CSV 备查。
+      # 用 always() 保证构建失败时也能拿到报告。
+      - name: DumpClassInitializationReport
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "===== 类初始化报告（筛选 javafx / prism / glass / io.github）====="
+          $files = Get-ChildItem -Path 'target/reports' -Filter '*.csv' -ErrorAction SilentlyContinue
+          if (-not $files) { Write-Host '（未找到 target/reports/*.csv）' }
+          foreach ($f in $files) {
+            Write-Host "--- $($f.Name)"
+            Select-String -Path $f.FullName -Pattern 'com\.sun\.javafx|com\.sun\.prism|com\.sun\.glass|^javafx|io\.github' | ForEach-Object { Write-Host $_.Line }
+          }
+
+      - name: UploadClassInitializationReport
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: class-initialization-report
+          path: target/reports/*.csv
+          if-no-files-found: warn
+          retention-days: 14
+
+      # 产物收集：**只收 exe**。
+      # JavaFX 的平台原生 DLL 已作为资源编进镜像（见 pom 的 native-image profile 与
+      # resource-config.json 的 *.dll 规则），运行期由 OpenJFX 的 NativeLibLoader 从
+      # 镜像内资源解到 ~/.openjfx/cache/ 后加载 —— 所以发布包只需一个 exe。
+      # 正因包里不再带 DLL，这里加两道自证，避免「资源没编进去」被静默带过。
+      - name: CollectArtifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'target/LegionFanControl.exe')) {
+            throw '未找到 target/LegionFanControl.exe，原生编译疑似失败，请查看上方构建日志'
+          }
+          New-Item -ItemType Directory -Path stage | Out-Null
+          Copy-Item 'target/LegionFanControl.exe' stage/
+
+          # 自证①：fat jar 里必须有 DLL —— 它没有，镜像里必然也没有
+          $fxtmp = Join-Path $env:RUNNER_TEMP 'fxdll'
+          if (Test-Path $fxtmp) { Remove-Item $fxtmp -Recurse -Force }
+          Expand-Archive -Path 'target/LegionFanControl.jar' -DestinationPath $fxtmp -Force
+          $dlls = Get-ChildItem $fxtmp -Filter *.dll
+          if (-not $dlls) { throw 'fat jar 中未提取到任何 DLL，JavaFX 依赖可能异常（镜像内的原生库会缺失）' }
+
+          # 自证②：exe 里要能查到这些原生库名 —— 发布包只有这一个文件，它坏了就是坏了
+          $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes('target/LegionFanControl.exe'))
+          $missing = @('glass.dll', 'prism_d3d.dll', 'javafx_font.dll') | Where-Object { -not $text.Contains($_) }
+          if ($missing) {
+            throw ("exe 内未找到嵌入的原生库名：{0} —— 资源未编进镜像（检查 resource-config.json 的 dll 规则）" -f ($missing -join ', '))
+          }
+
+          # 自证③：可达性元数据必须齐全 —— 这一条是 2026-10-10 真机 segfault 的产物。
+          # 崩在 [WindowsNativeRunloopThread] WinApplication._runLoop(Native Method)：
+          # native 「按名字回调 Java」时拿到空引用继续跑 → segfault，而构建期毫无征兆。
+          # 根因是 jni-config.json 缺 java.lang.Runnable / java.lang.Object 等「JNI 可达」类。
+          # 注意：这两份清单**不能靠扫 fat jar 得到** —— native 源码里以字面量出现的类名
+          # （FindClass）与平台子类自己的成员（Get*ID）在 fat jar 的类清单里看不出来。
+          # 清单的生成方式见 Docs/NativeImageCi.md 第 5 节第 7 条。
+          $metaDir = 'target/classes/META-INF/native-image'
+          $jni = @(Get-Content -Raw -LiteralPath "$metaDir/jni-config.json" | ConvertFrom-Json)
+          $rfl = @(Get-Content -Raw -LiteralPath "$metaDir/reflect-config.json" | ConvertFrom-Json)
+          Write-Host ("可达性元数据：reflect {0} 条，jni {1} 条" -f $rfl.Count, $jni.Count)
+
+          $jniNames = $jni | ForEach-Object { $_.name }
+          # GlassRobot / WinRobot：新增「屏幕字形像素」诊断后，抓屏幕走 javafx.scene.robot.Robot，
+          # native 侧会按名字找这两个类的成员 —— 不在册则这一步失败（不影响启动，但诊断就废了）。
+          foreach ($must in @('java.lang.Object', 'java.lang.Runnable', 'java.lang.String',
+                              'java.util.HashMap', 'java.nio.ByteBuffer',
+                              'com.sun.glass.ui.Application', 'com.sun.glass.ui.Window',
+                              'com.sun.glass.ui.View', 'com.sun.glass.ui.Screen',
+                              'com.sun.glass.ui.win.WinWindow', 'com.sun.glass.ui.EventLoop',
+                              'com.sun.glass.ui.GlassRobot', 'com.sun.glass.ui.win.WinRobot')) {
+            if ($jniNames -notcontains $must) {
+              throw "jni-config.json 缺少 JNI 可达类：$must —— native 回调时拿空引用继续跑，落点就是 segfault"
+            }
+          }
+
+          $rflNames = $rfl | ForEach-Object { $_.name }
+          foreach ($must in @('io.github.acnxo.legion.fan.FanControlApp',
+                              # FXML 界面（界面与业务分离重构）：fx:controller 指定的控制器，
+                              # 靠反射注入 @FXML 字段与调用事件方法；缺了就是启动即「界面加载失败」
+                              'io.github.acnxo.legion.fan.FanControlController',
+                              # 「字形掩码探针」所需（issue #20 根因判定用，反射直插字体内部）
+                              'com.sun.javafx.font.FontResource', 'com.sun.javafx.font.FontStrike',
+                              'com.sun.javafx.font.Glyph', 'com.sun.javafx.geom.transform.BaseTransform',
+                              'com.sun.javafx.font.directwrite.DWGlyph',
+                              'com.sun.javafx.font.directwrite.IDWriteGlyphRunAnalysis',
+                              'com.sun.prism.impl.PrismSettings',
+                              'com.sun.javafx.tk.quantum.QuantumToolkit',
+                              'com.sun.prism.d3d.D3DPipeline')) {
+            if ($rflNames -notcontains $must) { throw "reflect-config.json 缺少关键类：$must" }
+          }
+
+          # 类族完整性：JavaFX「按名字加载」的类族必须**整族在册**（不能只补报错的那一个）。
+          # 2026-10-10 真机：字符集修完后界面刚建就拓在
+          #   Utils.forceInit → Class.forName("javafx.css.StyleableFloatProperty")
+          # —— forceInit 的实现就是 Class.forName，只被它引用的类会被分析丢掉。
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zipPath = (Resolve-Path 'target/LegionFanControl.jar').Path
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+          try {
+            $jarNames = @($zip.Entries | Where-Object { $_.FullName -like '*.class' } |
+              ForEach-Object { $_.FullName -replace '\.class$','' -replace '/','.' })
+          } finally { $zip.Dispose() }
+          $families = @(
+            @{ Name = '着色器 loader';  Pattern = '^com\.sun\.prism\.shader\.\w+_Loader$' },
+            @{ Name = '效果 peer';      Pattern = '^com\.sun\.scenario\.effect\.impl\..*Peer$' },
+            @{ Name = 'CSS 属性接口';    Pattern = '^javafx\.css\.Styleable\w*Property$' }
+          )
+          foreach ($fam in $families) {
+            $members = @($jarNames | Where-Object { $_ -match $fam.Pattern })
+            $missing = @($members | Where-Object { $rflNames -notcontains $_ })
+            Write-Host ("  类族 {0}：产内 {1} 个，未登记 {2} 个" -f $fam.Name, $members.Count, $missing.Count)
+            if ($missing.Count -gt 0) {
+              $eg = (($missing | Select-Object -First 2) -join ', ')
+              throw ("reflect-config.json 未整族登记「{0}」：缺 {1} 个（例：{2}）—— 运行期会 ClassNotFoundException" -f $fam.Name, $missing.Count, $eg)
+            }
+          }
+          Write-Host '自证③：JavaFX 按名字加载的类族已整族在册 ✅'
+
+          # 反向守卫：类名写错时既不报错也不生效（静默失效），必须当场拦下。
+          $bogus = @($rflNames + $jniNames) | Where-Object { $_ -like '*font.dwrite.*' }
+          if ($bogus) { throw ("元数据含不存在的包名（真实包是 font.directwrite）：" + ($bogus -join ', ')) }
+
+          $dup = @($jniNames | Group-Object | Where-Object { $_.Count -gt 1 })
+          if ($dup) { throw ("jni-config.json 有重复条目：" + ($dup.Name -join ', ')) }
+          # 反射侧的同类守卫：管线 / 工具包 / 平台工厂 / 字体工厂都是「Class.forName + 取构造器」
+          # 加载的（见 Docs/NativeImageCi.md 第 5 节第 7 条的表），条目在、构造器没登记，
+          # 真机就是 no suitable pipeline found / No toolkit found —— 而且构建全绿。
+          # 2026-10-10 踩过：清单 259 → 408 条看着更全，实际 253 个类反向丢了 allDeclared*。
+          $needsCtor = @('com.sun.prism.d3d.D3DPipeline', 'com.sun.prism.sw.SWPipeline',
+                         'com.sun.glass.ui.win.WinPlatformFactory',
+                         'com.sun.javafx.tk.quantum.QuantumToolkit',
+                         'com.sun.javafx.font.directwrite.DWFactory')
+          foreach ($type in $needsCtor) {
+            $entry = @($rfl | Where-Object { $_.name -eq $type })
+            if ($entry.Count -eq 0) { throw "reflect-config.json 缺条目：$type" }
+            if (-not ($entry[0].allDeclaredConstructors -or $entry[0].allPublicConstructors -or $entry[0].constructors)) {
+              throw "reflect-config.json 里 $type 未登记构造器 —— 反射取构造器会拿到 null（no suitable pipeline found / No toolkit found）"
+            }
+          }
+          Write-Host '自证③：关键反射点均已登记构造器 ✅'
+
+          Write-Host '自证③通过：元数据关键类齐全、无重复、无失效类名'
+
+          Write-Host '===== 产物收集完成 ====='
+          Write-Host ("发布包内容: stage/ 下 {0} 个文件（只含 exe）；fat jar 内 DLL {1} 个，已作为资源编入 exe" -f (Get-ChildItem stage).Count, $dlls.Count)
+          Get-ChildItem stage | Sort-Object Length -Descending |
+            Format-Table Name, @{Label = 'SizeMB'; Expression = { [math]::Round($_.Length / 1MB, 1) }}
+
+      # artifact 名带版本号：版本号直接从 pom.xml 的顶层 <version> 读取，升级版本零改动。
+      # 刻意不二次调用 Maven（原实现 mvn help:evaluate + Select-Object -Last 1）：
+      #   1. 省一次 Maven 启动开销；
+      #   2. PowerShell 7 会把 mvn 的 stderr 一并并入管道，末行取到的是
+      #      [ERROR] [Help 1] ...LifecyclePhaseNotFoundException，真正的报错行被
+      #      Select-Object -Last 1 吃掉 —— 本步首次实跑即因此失败（run 38036445252），
+      #      且日志里看不到根因。
+      # 用 local-name() 取节点：pom 带默认命名空间，直接点取属性名不可靠。
+      # 运行期冒烟：把 exe **真跑一下**，专治「构建全绿但一运行就炸」。
+      #
+      # 起因（2026-10-10 真机 + 本机复现）：Windows 的 sun.jnu.encoding 是**代码页**
+      # （中文 Windows 为 GBK），而镜像默认只带少量字符集 —— sun.nio.fs.Util /
+      # java.lang.ProcessImpl 的静态初始化会 Charset.forName(sun.jnu.encoding)，
+      # 缺字符集就抛 UnsupportedCharsetException → 类初始化失败 → 连带 NativeLibLoader
+      # 的第①条路径中断 → 原生库永远加载不到 → 表现为「两条 Prism 管线都起不来」。
+      # 详见 Docs/NativeImageCi.md 第 5 节第 13 条。
+      #
+      # 判定：用 GBK 复现该条件，输出里**没有**字符集/类初始化失败即通过；
+      # 后续在无显示环境下的失败（No toolkit found 等）不影响判定。
+      - name: SmokeTestCharsets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'target/LegionFanControl.exe'
+          if (-not (Test-Path $exe)) { throw "未找到 $exe，无法做运行期冒烟" }
+          $out = Join-Path $env:RUNNER_TEMP 'smoke.out.txt'
+          $errf = Join-Path $env:RUNNER_TEMP 'smoke.err.txt'
+          Write-Host '===== 运行期冒烟：非 UTF-8 字符集（GBK）====='
+          $proc = Start-Process -FilePath $exe -ArgumentList '-Dsun.jnu.encoding=GBK' -PassThru -RedirectStandardOutput $out -RedirectStandardError $errf
+          if (-not $proc.WaitForExit(60000)) {
+            $proc.Kill()
+            Write-Host '进程 60s 未退出，已结束（无交互桌面时属预期）'
+          }
+          $text = ''
+          foreach ($f in @($out, $errf)) {
+            if (Test-Path $f) { $text += (Get-Content -Raw -LiteralPath $f) }
+          }
+          Write-Host ("输出长度：{0} 字符" -f $text.Length)
+          if ($text -match 'UnsupportedCharsetException' -or $text -match 'Could not initialize class sun\.nio\.fs') {
+            Write-Host $text
+            throw '运行期冒烟失败：镜像缺字符集 —— pom 的 native-image profile 需要 -H:+AddAllCharsets（见 Docs/NativeImageCi.md 第 5 节第 13 条）'
+          }
+          # 界面重构（FXML）后的硬断言 —— 两个标记都用**纯 ASCII**：
+          # 冒烟以 GBK 运行（模拟中文 Windows），中文输出在日志里可能是乱码，ASCII 不受影响。
+          # 二者来自 FanControlApp（失败路径）与 FanControlController.initialize()（成功路径）。
+          if ($text -match '\[ui-fxml-load-failed\]') {
+            Write-Host $text
+            throw '运行期冒烟失败：FXML 视图未能加载（fxml/css 资源或控制器反射元数据缺失）—— 见 Docs/NativeImageCi.md 第 5 节第 20 条'
+          }
+          if ($text -notmatch '\[ui-fxml-loaded\]') {
+            Write-Host $text
+            throw '运行期冒烟失败：输出里没有 [ui-fxml-loaded] 标记 —— FXML 视图没有真正加载完（资源 / 元数据漏登记，或程序在加载前就退出了）'
+          }
+          Write-Host '冒烟通过：[ui-fxml-loaded] 命中，且无字符集 / 类初始化 / 视图加载失败 ✅'
+
+      # 自证④：exe 必须带 Windows 清单（dpiAware + supportedOS）。
+      #
+      # 2026-10-10 真机：原生包字体发虚，而 JVM 模式锐利；两份启动日志只差一行 ——
+      #   原生包：OS Information: Windows 8.0 build 9200      ← 无清单，Windows 谎报版本
+      #   JVM  ：Windows version 10.0 build 26300             ← java.exe 自带清单
+      # 无清单的进程被 Windows 判为「DPI 不感知」→ 整窗位图放大 → 字形发虚；
+      # 同时版本相关的代码分支（Win8.1+ 才用的 DPI 接口）会走旧路径。
+      # 清单本体是仓库根的 exe.manifest，由 pom 的 -H:NativeLinkerOption 交给链接器。
+      - name: CheckExeManifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'target/LegionFanControl.exe'
+          if (-not (Test-Path $exe)) { throw "未找到 $exe，无法检查 Windows 清单" }
+          $bytes = [System.IO.File]::ReadAllBytes($exe)
+          $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+          $utf16 = [System.Text.Encoding]::Unicode.GetString($bytes)
+          $needles = @('dpiAware', 'supportedOS', '{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}')
+          foreach ($needle in $needles) {
+            if (-not ($ascii.Contains($needle) -or $utf16.Contains($needle))) {
+              throw "exe 内未找到清单项 '$needle' —— 缺少 Windows 清单会导致 DPI 不感知（字体发虚）且系统版本谎报，见 Docs/NativeImageCi.md 第 5 节第 15 条"
+            }
+          }
+          Write-Host '自证④通过：exe 内已含 Windows 清单（dpiAware / supportedOS）✅'
+
+      # 自证：FXML 视图与其样式表必须**真的**编进了 exe。
+      # 「构建成功」不代表资源进了镜像 —— 资源或反射元数据漏登记时构建照样全绿，运行时才炸。
+      # 做法：在 exe 字节里找两段特征串（FXML 的 fx:controller 声明、CSS 的 .fan-grid 规则）。
+      - name: CheckExeFxmlView
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'target/LegionFanControl.exe'
+          if (-not (Test-Path $exe)) { throw "未找到 $exe，无法检查 FXML 视图资源" }
+          $text = [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($exe))
+          $needles = @('fx:controller="io.github.acnxo.legion.fan.FanControlController"', '.fan-grid')
+          foreach ($n in $needles) {
+            if (-not $text.Contains($n)) {
+              throw "exe 内未找到『$n』 —— FXML / CSS 资源没有编进镜像（检查 resource-config.json 的 fxml/css 规则，见 Docs/NativeImageCi.md 第 5 节第 20 条）"
+            }
+          }
+          Write-Host '自证通过：exe 内已含 FXML 视图与样式表 ✅'
+
+      # 自证：exe 内必须**真的**嵌入了程序图标 —— “rc 编译成功”不等于“链接进了 exe”。
+      # 做法：在 exe 字节里找 exe.ico 载荷（PNG）开头 32 字节的签名；资源节按原样存放，命中即证明已嵌入。
+      # 用 Latin1 把字节映射成字符串再 IndexOf：比逐字节双重循环快几个数量级（exe 约 36 MB）。
+      - name: CheckExeIcon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'target/LegionFanControl.exe'
+          if (-not (Test-Path $exe)) { throw "未找到 $exe，无法检查程序图标" }
+          if (-not (Test-Path 'exe.ico')) { throw '未找到 exe.ico' }
+          $ico = [System.IO.File]::ReadAllBytes('exe.ico')
+          if ($ico.Length -lt 64) { throw 'exe.ico 过小，无法生成签名' }
+          $sig = $ico[22..53]
+          $sigStr = [System.Text.Encoding]::Latin1.GetString($sig)
+          $exeStr = [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($exe))
+          if ($exeStr.IndexOf($sigStr) -lt 0) {
+            throw 'exe 内未找到程序图标签名 —— 图标没有真正嵌进 exe（检查 pom 的 -H:NativeLinkerOption=${project.basedir}/exe.res 是否生效、exe.res 是否在链接前就已生成）'
+          }
+          Write-Host '自证通过：exe 内已嵌入程序图标（PNG 载荷签名命中）✅'
+
+      # 自证⑤：exe 必须是 **GUI 子系统**。
+      # 子系统决定了 Windows 要不要为进程创建控制台窗口：CONSOLE(3) 就是「双击/提权启动先弹黑框」的根因。
+      # 这一项在 PE 头里可硬件级核实，不必等真机双击（详见 Docs/NativeImageCi.md 第 5 节第 18 条）。
+      - name: CheckExeSubsystem
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'target/LegionFanControl.exe'
+          if (-not (Test-Path $exe)) { throw "未找到 $exe，无法检查 PE 子系统" }
+          $bytes = [System.IO.File]::ReadAllBytes($exe)
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          $magic = [BitConverter]::ToUInt16($bytes, $peOffset + 24)
+          if ($magic -eq 0x20B) { $subsystemOffset = $peOffset + 24 + 68 }
+          elseif ($magic -eq 0x10B) { $subsystemOffset = $peOffset + 24 + 72 }
+          else { throw ("未知的 PE 可选头 Magic：0x{0:X}" -f $magic) }
+          $subsystem = [BitConverter]::ToUInt16($bytes, $subsystemOffset)
+          Write-Host ("PE 子系统 = {0}（2 = GUI，3 = Console）" -f $subsystem)
+          if ($subsystem -ne 2) {
+            throw 'exe 的 PE 子系统不是 GUI(2)：双击与「以管理员身份运行」都会先弹出控制台窗口，请检查 pom 里是否还带着 /SUBSYSTEM:WINDOWS 与 /ENTRY:mainCRTStartup（Docs/NativeImageCi.md 第 5 节第 18 条）'
+          }
+          Write-Host '自证⑤通过：exe 为 GUI 子系统，不会创建控制台窗口 ✅'
+
+      # 自证⑥：脚本行尾与 BOM（.cmd / .bat 必须 CRLF、.ps1 必须 LF、.cmd 不得带 BOM）
+      #
+      # 为何必须机器兜底：行尾约定只写在文件注释与文档里（DevelopmentConventions 第 8 条），
+      # 挡不住编辑器 / sed / 批量改写 —— 实测 Dist/Bootstrap.cmd 与 4 个提权探针
+      # 都曾在仓库里退化成 LF，而 Bootstrap.cmd 正是 JVM 版的双击入口（TS-2610-002）。
+      # LF 时 cmd.exe 按代码页逐字节读取含中文的行会发生**行读取位置漂移**，
+      # 后续行被当成命令执行（控制台喷 'xxx' is not recognized ... 碎片报错）。
+      # 这里查的正是**会被打进 Dist 发布 zip 的那份工作区文件**。
+      - name: CheckScriptLineEndings
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bad = New-Object System.Collections.ArrayList
+          $cmdFiles = @(git ls-files '*.cmd' '*.bat')
+          foreach ($p in $cmdFiles) {
+            if (-not (Test-Path -LiteralPath $p)) { continue }
+            $bytes = [System.IO.File]::ReadAllBytes($p)
+            if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+              [void]$bad.Add("$p 含 UTF-8 BOM（.cmd 不得带 BOM）")
+            }
+            for ($i = 0; $i -lt $bytes.Length; $i++) {
+              if ($bytes[$i] -eq 0x0A -and ($i -eq 0 -or $bytes[$i - 1] -ne 0x0D)) {
+                [void]$bad.Add("$p 第 $($i + 1) 字节是裸 LF（.cmd 必须 CRLF）")
+                break
+              }
+            }
+          }
+          $psFiles = @(git ls-files '*.ps1')
+          foreach ($p in $psFiles) {
+            if (-not (Test-Path -LiteralPath $p)) { continue }
+            $bytes = [System.IO.File]::ReadAllBytes($p)
+            if ($bytes -contains [byte]0x0D) { [void]$bad.Add("$p 含 CR（.ps1 约定 LF）") }
+          }
+          # 属性也要在：否则换台机器 / 换个 core.autocrlf 就会重新漂回去
+          foreach ($line in @(git ls-files --eol -- '*.cmd' '*.ps1')) {
+            if ($line -match '\.(cmd|bat)\s*$') {
+              if ($line -notmatch 'w/crlf') { [void]$bad.Add("工作区行尾不是 CRLF：$line") }
+              if ($line -notmatch 'eol=crlf') { [void]$bad.Add("缺少 text eol=crlf 属性：$line") }
+            } elseif ($line -match '\.ps1\s*$') {
+              if ($line -match 'i/(lf|crlf)' -and $line -notmatch 'w/lf') { [void]$bad.Add("工作区行尾不是 LF：$line") }
+            }
+          }
+          if ($bad.Count -gt 0) {
+            foreach ($b in $bad) { Write-Host "  · $b" }
+            throw '脚本行尾约定被破坏 —— 见 Docs/DevelopmentConventions.md 第 8 条 与 Docs/TroubleShooting/TS-2610-002'
+          }
+          Write-Host "自证⑥通过：$($cmdFiles.Count) 个 .cmd/.bat 全为 CRLF 且无 BOM；$($psFiles.Count) 个 .ps1 全为 LF ✅"
+
+      - name: ReadProjectVersion
+        id: ver
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [xml]$pom = Get-Content -Raw -LiteralPath 'pom.xml'
+          $node = $pom.SelectSingleNode('/*[local-name()="project"]/*[local-name()="version"]')
+          if (-not $node) { throw 'pom.xml 顶层没有 <version>（若版本改由 parent 或属性提供，需换读取方式）' }
+          $v = $node.InnerText.Trim()
+          if ($v -notmatch '^\d+(\.\d+)+') { throw "解析 pom.xml 的 project.version 失败：'$v'" }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "project.version = $v"
+
+      # 构建报告打包：native-image 的报告（build-report + 类初始化 CSV）打成**独立 zip**，
+      # 作为发布物的一项。
+      # 为何不放进 stage/：原生包在 PackageZip 有「assets/ 只能有一个文件」的硬断言。
+      # 为何名字里不带 windows-x64：UpdateNative.cmd 按 `*native-windows-x64.zip` 匹配。
+      - name: PackageBuildReport
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ver = '${{ steps.ver.outputs.version }}'
+          New-Item -ItemType Directory -Path report-stage -Force | Out-Null
+          New-Item -ItemType Directory -Path stage-report -Force | Out-Null
+          # 报告有两处来源，统一以 target/ 为根收集：
+          #  · target/LegionFanControl-build-report.html —— GraalVM 的报告本体（自包含，未压缩约 50 MiB）
+          #  · target/reports/class_initialization_*.csv —— 类初始化配置与报告
+          $found = @()
+          $found += @(Get-ChildItem -Path 'target' -Filter '*build-report*' -File -ErrorAction SilentlyContinue)
+          if (Test-Path 'target/reports') {
+            $found += @(Get-ChildItem -Path 'target/reports' -Recurse -File)
+          }
+          if ($found.Count -eq 0) {
+            Write-Host '::warning::没找到构建报告，本次不产出报告 zip'
+            Write-Host '候选位置：'
+            Get-ChildItem -Path 'target' -Recurse -Filter '*report*' -ErrorAction SilentlyContinue | Select-Object -First 20 | ForEach-Object { Write-Host "  $($_.FullName)" }
+            exit 0
+          }
+          $root = (Resolve-Path 'target').Path
+          foreach ($f in $found) {
+            $rel = $f.FullName.Substring($root.Length).TrimStart('\')
+            $dst = Join-Path 'report-stage' $rel
+            New-Item -ItemType Directory -Path (Split-Path $dst) -Force | Out-Null
+            Copy-Item $f.FullName $dst -Force
+          }
+          @(
+            'LegionFanControl 原生镜像构建报告',
+            '',
+            '内容：',
+            '  · LegionFanControl-build-report.html：构建报告本体（自包含，未压缩约 50 MiB）',
+            '  · reports/class_initialization_*.csv：类初始化配置与报告（判定是否存在构建期固化）',
+            '',
+            '用途：排查原生包与 JVM 版的行为差异（issue #20 归因），以及审计镜像收录情况。',
+            '注意：这是构建期快照，与对应发行版本的源码一一对应。',
+            "版本：LegionFanControl $ver"
+          ) | Out-File -FilePath 'report-stage/README.txt' -Encoding utf8
+          $zip = "stage-report/LegionFanControl-$ver-native-build-report.zip"
+          Compress-Archive -Path 'report-stage/*' -DestinationPath $zip -Force
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $entries = @(([System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip).Path)).Entries | ForEach-Object { $_.FullName })
+          if ($entries.Count -lt 2) { throw "构建报告 zip 内容过少：$($entries -join ', ')" }
+          if (-not ($entries | Where-Object { $_ -match 'build-report|class_initialization' })) {
+            throw "构建报告 zip 里既无 build-report 也无 class_initialization：$($entries -join ', ')"
+          }
+          Write-Host ("构建报告包（{0} 个条目）：{1}" -f $entries.Count, ($entries -join ', '))
+
+      # 报告缺失不应挡住发布
+      - name: UploadBuildReportArtifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: LegionFanControl-${{ steps.ver.outputs.version }}-native-build-report
+          path: stage-report/*
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: UploadArtifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: LegionFanControl-${{ steps.ver.outputs.version }}-native-windows-x64
+          path: stage/*
+          if-no-files-found: error
+          retention-days: 14
+
+      # JVM 版（fat jar）也随发布包一起发：**下载即用，不必本地构建**。
+      # 内容与仓库的 Dist/ 完全一致，因此 JVM 侧与原生侧天然同源码、同版本号，
+      # 适合做两类对照：① 渲染差异排查（issue #20）；② 原生包出问题时的回退方案。
+      # 单独一个 artifact（不进 stage/）：原生包的 PackageZip 有「只能有一个文件」的断言。
+      - name: PackageJvmZip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ver = '${{ steps.ver.outputs.version }}'
+          if (-not (Test-Path 'Dist/LegionFanControl.jar')) {
+            throw '未找到 Dist/LegionFanControl.jar —— fat jar 没导出到 Dist/，JVM 包无法生成'
+          }
+          New-Item -ItemType Directory -Path stage-jvm | Out-Null
+          $zip = "stage-jvm/LegionFanControl-$ver-jvm-windows-x64.zip"
+          # 不带目录层级：解压即得 Dist/ 的内容
+          Compress-Archive -Path 'Dist/*' -DestinationPath $zip -Force
+          # 自证：jar 与启动脚本必须在；exe 不得混进来（那是原生包的事）
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $entries = @(([System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip).Path)).Entries |
+            ForEach-Object { $_.FullName })
+          foreach ($must in @('LegionFanControl.jar', 'Bootstrap.cmd', 'README.md', 'UpdateJvm.cmd', 'UpdateJvm.ps1')) {
+            if ($entries -notcontains $must) { throw "JVM 包缺少 $must；实际内容：$($entries -join ', ')" }
+          }
+          $stray = @($entries | Where-Object { $_ -match '\.exe$' })
+          if ($stray.Count -gt 0) { throw "JVM 包内不应含 exe：$($stray -join ', ')" }
+          Write-Host ("JVM 包内容（{0} 个文件）：{1}" -f $entries.Count, ($entries -join ', '))
+
+      - name: UploadJvmArtifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: LegionFanControl-${{ steps.ver.outputs.version }}-jvm-windows-x64
+          path: stage-jvm/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── 发布：把构建产物挂到 GitHub Release 页面 ─────────────────────────────
+  #
+  # tag 规则（先反查 PR，再决定编号段）：
+  #   ① 正式版发布：dev → main 的发布 PR 合并            → V<版本>，正式 release
+  #   ② 其余一律预发行，编号段二选一：
+  #        · 能反查到 PR（含 dev 分支的 PR 合并、手动触发时的 PR） → V<版本>.<PR 五位>
+  #        · 反查不到 PR（直接 push / 手动触发 / API 限流）       → V<版本>.<yyyyMMddHHmm>
+  #     适用：push 到 main（非 dev → main）、push 到 dev、workflow_dispatch。
+  #
+  # PR 号五位、不足左补 0（PR #1 → 00001）；时间戳取 UTC 的 yyyyMMddHHmm。
+  # 不给「反查不到 PR」留 00000 之类占位：时间戳天然唯一，也不会与前一次撞车。
+  #
+  # 【为什么发布不另设一条 tag 触发的工作流】
+  #   用 GITHUB_TOKEN 创建的 tag 不会触发下游工作流（GitHub 防递归的既定行为），
+  #   故直接在同一工作流内建 release，避免出现「tag 打了但发布没跑」的隐式链路。
+  publish:
+    name: PublishRelease
+    needs: build-native-image
+    # PR 事件只构建、不发布 —— 否则每个 PR 都会打 tag / 建 release
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # 本仓库 Actions 默认权限是 read（见 actions/permissions/workflow），
+    # 创建 tag / release 必须显式申请 contents: write。
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: DownloadArtifact
+        uses: actions/download-artifact@v8
+        with:
+          name: LegionFanControl-${{ needs.build-native-image.outputs.version }}-native-windows-x64
+          path: assets
+
+      # JVM 版单独一个 artifact（同样是「下载即用」的交付物）
+      - name: DownloadJvmArtifact
+        uses: actions/download-artifact@v8
+        with:
+          name: LegionFanControl-${{ needs.build-native-image.outputs.version }}-jvm-windows-x64
+          path: assets-jvm
+
+      # 构建报告（可选产物）：拿不到不影响发布
+      - name: DownloadBuildReportArtifact
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: LegionFanControl-${{ needs.build-native-image.outputs.version }}-native-build-report
+          path: assets-report
+
+      - name: ComposeTag
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          BASE: ${{ needs.build-native-image.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # 先确定「本次提交对应哪个 PR」，按可靠性依次尝试：
+          #   ① squash 合并提交的标题带 (#NN) —— 最可靠（GitHub 自动追加）
+          #   ② 按提交反查 PR —— 兜底，但它可能返回**并非引入本次提交的那个 PR**
+          #      （2026-10-10 实锤：PR #24 合入 dev 后这里返回了 #21，导致 tag 复用
+          #       V0.2.0.00021，把既有 release 的资产静默覆盖）
+          # 拿不到 PR 就降级为 UTC 时间戳。
+          subject="$(gh api "repos/${REPO}/commits/${SHA}" --jq '.commit.message' 2>/dev/null | head -1 || true)"
+          pr="$(printf '%s' "${subject}" | sed -n 's/.*(#\([0-9][0-9]*\))[[:space:]]*$/\1/p')"
+          if [ -n "${pr}" ]; then
+            pr_source="提交标题的 (#${pr})"
+          else
+            pr="$(gh api "repos/${REPO}/commits/${SHA}/pulls" --jq '.[0].number // ""' 2>/dev/null || true)"
+            pr_source="按提交反查（可能不准）"
+          fi
+          # head 分支由「已确定的 PR」反查，而不是由提交关联反查 —— 后者同样可能张冠李戴
+          head=""
+          if [ -n "${pr}" ]; then
+            head="$(gh api "repos/${REPO}/pulls/${pr}" --jq '.head.ref // ""' 2>/dev/null || true)"
+          fi
+
+          if [ "${EVENT_NAME}" = "push" ] && [ "${REF}" = "refs/heads/main" ] && [ "${head}" = "dev" ]; then
+            # 正式版发布：dev → main 的发布 PR 合并（唯一不带编号段的情形）
+            prerelease=false
+            tag="V${BASE}"
+            reason="PR #${pr}（head=dev）合并进 main → 正式版，不带编号段；PR 来源：${pr_source}"
+          else
+            # 其余一律预发行
+            prerelease=true
+            if [ -n "${pr}" ]; then
+              segment="$(printf '%05d' "${pr}")"
+              reason="PR #${pr}（head=${head}）→ 编号段 ${segment}；PR 来源：${pr_source}"
+            else
+              segment="$(date -u +%Y%m%d%H%M)"
+              reason="没能反查到 PR（直接 push / 手动触发 / API 限流）→ 降级为时间戳段 ${segment}（UTC）"
+              echo "::warning::没能反查到 PR，tag 的编号段降级为 UTC 时间戳 ${segment}"
+            fi
+            # 防覆盖：同名 tag 已存在时（同一 PR 的重复构建、或上面的 PR 张冠李戴）
+            # 绝不重用 —— 否则**会把既有 release 的资产静默换掉**，而列表上看不出新条目。
+            if gh api "repos/${REPO}/git/ref/tags/V${BASE}.${segment}" >/dev/null 2>&1; then
+              echo "::warning::tag V${BASE}.${segment} 已存在 → 改用 UTC 时间戳段，避免覆盖既有 release 的资产"
+              segment="$(date -u +%Y%m%d%H%M)"
+              reason="${reason}；但该 tag 已存在，为防覆盖降级为时间戳段 ${segment}（UTC）"
+            fi
+            tag="V${BASE}.${segment}"
+          fi
+
+          if [ "${prerelease}" = "true" ]; then
+            note='> ⚠️ **预发行版（Pre-release）**：由普通 PR 合并、`dev` 分支推送或手动试跑产出，**不是**正式发行版本。正式使用请选不带编号段的正式 tag。'
+          else
+            note='> ✅ **正式发行版**：由 `dev` → `main` 的发布 PR 合并产出。'
+          fi
+
+          {
+            echo "tag=${tag}"
+            echo "prerelease=${prerelease}"
+            echo "note=${note}"
+            # 资产名与被发布的 tag 同源（去掉开头的 V）：V0.2.0.00059 → 0.2.0.00059；
+            # 正式版 tag 无编号段（V0.2.0）→ 资产名也无编号段。单一来源，不重复推算。
+            echo "asset_ver=${tag#V}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "tag = ${tag}（prerelease=${prerelease}）"
+          echo "依据：${reason}"
+          {
+            echo "### 发布：\`${tag}\`"
+            echo ""
+            echo "| 项 | 值 |"
+            echo "|---|---|"
+            echo "| 类型 | $([ "${prerelease}" = "true" ] && echo 'Pre-release（预发行）' || echo '正式 release') |"
+            echo "| 基线版本 | \`${BASE}\`（读自 pom.xml） |"
+            echo "| 资产命名 | \`LegionFanControl-${tag#V}-…-windows-x64.zip\`（与 tag 同源） |"
+            echo "| 判定依据 | ${reason} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 打包成 zip：download-artifact 是把产物**解压**出来（v4 没有「保留 zip」选项），
+      # 不是交给你一个 zip 文件 —— 所以发布页上那个 zip 得自己打。
+      - name: PackageZip
+        shell: bash
+        env:
+          # 资产名里的版本段：与 tag 同源（V0.2.0.00059 → 0.2.0.00059），保证下载页看到的
+          # 包名与页面 tag 一致；五位编号段让同一版本下的多次构建可区分、且可排序对齐。
+          ASSET_VER: ${{ steps.tag.outputs.asset_ver }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ASSET_VER}" ]; then
+            echo "::error::asset_ver 为空（ComposeTag 未产出）"
+            exit 1
+          fi
+          echo "资产版本段 = ${ASSET_VER}"
+          ls -l assets
+          # 发布包内只应有 exe（平台原生库已编进镜像）：多出任何文件都说明上游改错了
+          count=$(find assets -type f | wc -l | tr -d ' ')
+          if [ "$count" != "1" ] || [ ! -f assets/LegionFanControl.exe ]; then
+            echo "::error::发布包期望只含 LegionFanControl.exe 一个文件，实际 ${count} 个：$(find assets -type f -printf '%f ')"
+            exit 1
+          fi
+          # 包内自带**一层与 zip 同名**的目录（目录名 = 资产名，含编号段）：
+          # 这样用 WinRAR / 资源管理器「解压到当前目录」时只会多出一个与 zip 同名的文件夹，
+          # 不会把文件散落到当前目录；包内文件名保持固定（升级脚本 / Bootstrap.cmd 按固定名定位）。
+          native_dir="LegionFanControl-${ASSET_VER}-native-windows-x64"
+          jvm_dir="LegionFanControl-${ASSET_VER}-jvm-windows-x64"
+          report_dir="LegionFanControl-${ASSET_VER}-native-build-report"
+          rm -rf stage LegionFanControl-*.zip
+          mkdir -p "stage/${native_dir}" "stage/${jvm_dir}"
+          cp assets/LegionFanControl.exe "stage/${native_dir}/"
+
+          # JVM 包是 build 作业里按纯版本号打好的（那里还不知道编号段），这里解开后按最终资产名重打。
+          # 里面还是原来的文件（Bootstrap.cmd / README.md / fat jar / 升级脚本），文件名不动。
+          jvm_count=$(ls -1 assets-jvm/*.zip 2>/dev/null | wc -l | tr -d ' ')
+          if [ "${jvm_count}" != "1" ]; then
+            echo "::error::期望恰好一个 JVM 包，实际 ${jvm_count} 个：$(ls -1 assets-jvm 2>/dev/null | tr '\n' ' ')"
+            exit 1
+          fi
+          unzip -q "$(ls -1 assets-jvm/*.zip)" -d "stage/${jvm_dir}"
+
+          # 构建报告包（可选）：有就一起发、同样带上编号段；没有不影响发布
+          report_ok=0
+          if compgen -G "assets-report/*-native-build-report.zip" > /dev/null; then
+            mkdir -p "stage/${report_dir}"
+            unzip -q "$(ls -1 assets-report/*-native-build-report.zip)" -d "stage/${report_dir}"
+            report_ok=1
+          else
+            echo "::warning::没有构建报告包（可选产物，不影响发布）"
+          fi
+
+          # 重打成发布用 zip：-r 保证每个条目都带顶层目录
+          (cd stage && zip -q -r "../${native_dir}.zip" "${native_dir}")
+          (cd stage && zip -q -r "../${jvm_dir}.zip" "${jvm_dir}")
+          if [ "${report_ok}" = "1" ]; then
+            (cd stage && zip -q -r "../${report_dir}.zip" "${report_dir}")
+          fi
+          echo "构建报告包：$(ls -1 LegionFanControl-*-native-build-report.zip 2>/dev/null | tr '\n' ' ')"
+
+          # 自证：三个资产名必须都以同一个版本段开头，且后缀仍能被升级脚本的通配命中
+          for f in LegionFanControl-*.zip; do
+            case "$f" in
+              "LegionFanControl-${ASSET_VER}-"*) ;;
+              *) echo "::error::资产名与版本段不一致：$f（期望 LegionFanControl-${ASSET_VER}-…）"; exit 1 ;;
+            esac
+          done
+
+          # 自证⑦：包内**有且只有一层**目录，且目录名与 zip 同名（去掉 .zip）；关键文件按固定名就在该目录下
+          check_one_top() {
+            zipfile="$1"
+            base="${zipfile%.zip}"
+            list=$(unzip -Z1 "$zipfile")
+            tops=$(printf '%s\n' "$list" | cut -d/ -f1 | sort -u | tr '\n' ' ')
+            if [ "${tops}" != "${base} " ]; then
+              echo "::error::${zipfile} 顶层不是唯一的同名目录（期望 ${base}/，实际：${tops}）"
+              exit 1
+            fi
+            bad=$(printf '%s\n' "$list" | grep -v "^${base}/" | tr '\n' ' ' || true)
+            if [ -n "${bad}" ]; then
+              echo "::error::${zipfile} 里有不在 ${base}/ 之下的条目：${bad}"
+              exit 1
+            fi
+            echo "${zipfile}：顶层目录 ${base}/ ✓"
+          }
+          check_one_top "${native_dir}.zip"
+          check_one_top "${jvm_dir}.zip"
+          [ "${report_ok}" = "1" ] && check_one_top "${report_dir}.zip"
+
+          # 自证⑧：包内关键文件名**保持固定**（升级脚本 / Bootstrap.cmd 按固定名定位，不得带版本号）
+          native_list=$(unzip -Z1 "${native_dir}.zip")
+          case "${native_list}" in
+            *"${native_dir}/LegionFanControl.exe"*) ;;
+            *) echo "::error::原生包里没有 ${native_dir}/LegionFanControl.exe"; exit 1 ;;
+          esac
+          jvm_list=$(unzip -Z1 "${jvm_dir}.zip")
+          for must in Bootstrap.cmd LegionFanControl.jar README.md UpdateJvm.cmd UpdateJvm.ps1 UpdateNative.cmd UpdateNative.ps1; do
+            case "${jvm_list}" in
+              *"${jvm_dir}/${must}"*) ;;
+              *) echo "::error::JVM 包里没有 ${jvm_dir}/${must}"; exit 1 ;;
+            esac
+          done
+          case "${jvm_list}" in
+            *.exe*) echo "::error::JVM 包内不应含 exe"; exit 1 ;;
+          esac
+          echo "包内文件名自证通过：exe / jar 均为固定名（不带版本号或编号段）✓"
+
+          unzip -l "LegionFanControl-${ASSET_VER}-native-windows-x64.zip"
+          unzip -l "LegionFanControl-${ASSET_VER}-jvm-windows-x64.zip"
+          echo "即将发布的资产：$(ls -1 LegionFanControl-*.zip | tr '\n' ' ')"
+
+      - name: PublishRelease
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          # Release 名就用 tag 本身（版本号 + 构建号，如 V0.2.0.00026）。
+          # 本页同时挂 JVM 包与原生包两种交付物，原先的「-LegionFanControl-Native-Image」
+          # 后缀已名不副实（2026-10-10 去掉）。交付物请以资产名区分。
+          name: ${{ steps.tag.outputs.tag }}
+          prerelease: ${{ steps.tag.outputs.prerelease }}
+          # 匹配不到文件就失败：action-gh-release 默认只告警，会静默建出一个「空 release」
+          # （V0.1.1.00002 就是这么来的：assets/*.zip 没匹配上，但步骤仍然 success）
+          fail_on_unmatched_files: true
+          files: LegionFanControl-*.zip
+          body: |
+            ## 这是什么
+
+            联想拯救者风扇控制工具 **LegionFanControl**（Windows x64）。本页同时附**两种交付物**，
+            按需取一个即可：
+
+            | 资产 | 形态 | 需要什么 | 适用 |
+            |---|---|---|---|
+            | `…-native-windows-x64.zip` | **原生镜像**：单个 `LegionFanControl.exe`，**自包含** | 什么都不需要（JavaFX 平台原生库已编进 exe） | 日常使用（推荐） |
+            | `…-jvm-windows-x64.zip` | **JVM 版**：`Bootstrap.cmd` + `README.md` + fat jar + 一键升级脚本 | **JDK 25+** 且 `java` 在 `PATH` | 对照排查、原生包出问题时的回退 |
+            | `…-native-build-report.zip` | **构建报告（附）**：`build-report` + 类初始化 CSV | 无需运行 | 排查原生包与 JVM 版差异、审计镜像收录情况（**不进升级脚本的匹配范围**） |
+
+            两者**版本号相同、源码相同**，出问题时可以互相对照（例如渲染差异排查）。
+
+            三个资产的名字都**与本页 tag 同源**（去掉开头的 `V`）：tag 为 `V0.2.0.00059` 时，资产名为
+            `LegionFanControl-0.2.0.00059-native-windows-x64.zip`；正式版 tag 不带编号段，资产名同样不带。
+            升级脚本按 `…-native-windows-x64.zip` / `…-jvm-windows-x64.zip` 通配匹配，因此改名不影响自动升级。
+
+            包内**自带一层与 zip 同名的目录**（例：`LegionFanControl-0.2.0.00059-native-windows-x64/LegionFanControl.exe`），
+            所以解压到当前目录时只会多出这一个文件夹；包内**文件名固定、不带版本号** —— 升级脚本与
+            `Bootstrap.cmd` 都按固定名定位（见 `Docs/DevelopmentConventions.md` 第 9、10 条）。
+
+            ## 版本
+
+            - 标签：`${{ steps.tag.outputs.tag }}`
+            - 基线版本：`${{ needs.build-native-image.outputs.version }}`（读自 `pom.xml`）
+            - 触发方式：`${{ github.event_name }}`（`${{ github.ref_name }}`）
+
+            ${{ steps.tag.outputs.note }}
+
+            ## 怎么用
+
+            1. 下载下方的 zip，解压出 `LegionFanControl.exe`（放哪个目录都行）；
+            2. 以**管理员身份**运行 `LegionFanControl.exe` —— 联想 WMI 提供程序在非管理员
+               上下文下会返回「拒绝访问」，温度与转速全部读不到；
+            3. 点「降温除尘」后风扇满速，约 2 分钟后自动交还 EC 自动控制。
+
+            > 形态差异：原生镜像（exe）下「启动时自动申请 UAC 提权」不可用（探不到 jar 路径），
+            > 因此请自行以管理员身份启动；`Dist/` 里的 JVM 版不受此影响。
+
+            ## 相关文档
+
+            - [`README.md`](https://github.com/${{ github.repository }}/blob/main/README.md)
+            - [`Docs/UserInterface.md`](https://github.com/${{ github.repository }}/blob/main/Docs/UserInterface.md)
+            - [`Docs/LimitationsAndRoadmap.md`](https://github.com/${{ github.repository }}/blob/main/Docs/LimitationsAndRoadmap.md)

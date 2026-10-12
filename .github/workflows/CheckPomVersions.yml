@@ -1,0 +1,35 @@
+name: CheckPomVersions
+
+# 独立静态护栏（不需要 Maven、不需要 GraalVM，几秒完成）：
+# Maven 模块里第三方构件的版本必须集中定义在 <properties>，
+# dependency / plugin 一律用 ${...} 引用 —— 版本只有单一来源。
+# 对应开发约定第 11 条，检查脚本 Script/CheckPomVersions.py。
+#
+# 为什么独立成工作流：这是纯文本规则，与主构建（原生镜像几十分钟）无关；
+# 单独跑能让「版本写死」这类问题在几十秒内就被指出来，而不是等主构建跑完。
+
+on:
+  push:
+    paths:
+      - 'pom.xml'
+      - 'Script/CheckPomVersions.py'
+      - '.github/workflows/CheckPomVersions.yml'
+  pull_request:
+    paths:
+      - 'pom.xml'
+      - 'Script/CheckPomVersions.py'
+      - '.github/workflows/CheckPomVersions.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: CheckPomVersions
+        run: python3 Script/CheckPomVersions.py pom.xml

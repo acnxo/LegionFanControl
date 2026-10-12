@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+
+<!--
+  界面结构（展示层）：只做声明式描述，行为写在 FanControlController。
+  约定：
+    · 任何间距 / 配色都不要写在这里，统一放 FanControlView.css；
+    · 控件通过 fx:id 注入控制器，事件通过 onAction 绑定到控制器方法。
+-->
+<HBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="io.github.acnxo.legion.fan.FanControlController"
+      alignment="CENTER"
+      stylesheets="@FanControlView.css">
+
+    <GridPane fx:id="grid" styleClass="fan-grid" maxWidth="Infinity" HBox.hgrow="ALWAYS">
+        <columnConstraints>
+            <!-- 第 1 列（标题）保持内容宽度；第 2 列吃掉多余空间，跨两列的状态栏与按钮随之变宽 -->
+            <ColumnConstraints/>
+            <ColumnConstraints hgrow="ALWAYS"/>
+        </columnConstraints>
+
+        <Label text="01-左风扇转速[CPU侧]" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <Label fx:id="fan1Value" text="--" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+        <Label text="02-右风扇转速[GPU侧]" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+        <Label fx:id="fan2Value" text="--" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+        <Label text="CPU 温度" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+        <Label fx:id="cpuTempValue" text="--" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+        <Label text="GPU 温度" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+        <Label fx:id="gpuTempValue" text="--" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+        <Label text="智能风扇模式" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+        <Label fx:id="modeValue" text="--" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+
+        <Button fx:id="toggleButton" text="开始降温除尘" maxWidth="Infinity" onAction="#onToggle"
+                GridPane.rowIndex="5" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
+
+        <Label fx:id="statusValue" wrapText="true" maxWidth="Infinity"
+               GridPane.rowIndex="6" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
+    </GridPane>
+</HBox>

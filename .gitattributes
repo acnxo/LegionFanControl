@@ -1,0 +1,17 @@
+# 行尾约定（机器强制）
+#
+# 文档：Docs/DevelopmentConventions.md 第 8 条、Docs/TroubleShooting/TS-2610-002。
+#
+# .cmd / .bat **必须** CRLF：
+#   cmd.exe 按系统代码页逐字节读取批处理文件。文件为 LF 行尾时，含中文的行
+#   （UTF-8 中文 3 字节）会被错误切分，**行读取位置漂移**，后续行被当成命令执行，
+#   控制台喷出 `'xxx' is not recognized as an internal or external command` 之类的碎片报错。
+#   根因是 LF，与编码无关（LF+UTF-8 与 LF+GBK 均失败；CRLF+UTF-8 与 CRLF+GBK 均正常）。
+#
+#   写 eol=crlf 而不是只靠 core.autocrlf：前者对**所有平台、所有本地 git 配置**都生效，
+#   保证任何人签出（以及 CI 打包进发布 zip）拿到的都是 CRLF。
+*.cmd text eol=crlf
+*.bat text eol=crlf
+#
+# .ps1 统一 LF（仓库既有约定；PowerShell 两者都能解析，统一后 diff 更干净）。
+*.ps1 text eol=lf
