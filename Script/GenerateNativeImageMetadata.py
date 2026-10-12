@@ -160,6 +160,13 @@ FXML_UI_CLASSES = (
     # 否则报 javax.xml.stream.FactoryConfigurationError: Provider … not found
     # （2026-10-12 实测，见 Docs/NativeImageCi.md 第 5 节第 21 条）。
     "com.sun.xml.internal.stream.XMLInputFactoryImpl",
+    # JavaFX 的反射工具类会在运行期用**自己的私有 SecureClassLoader** 定义 Trampoline
+    # （字节码是 javafx 模块里的一份资源）。native-image 禁止运行期定义类，报：
+    #   UnsupportedFeatureError: Classes cannot be defined at runtime … Tried to define class
+    # 但 Class.forName 在镜像里是先查 AOT 类注册表的：只要这个类**被编进镜像**，
+    # 就根本不会走到私有加载器 ⇒ 登记即强制包含，运行期不再定义。
+    # 2026-10-12 实测：登记前启动即崩（栈见 Docs/NativeImageCi.md 第 5 节第 21 条），登记后冒烟通过。
+    "com.sun.javafx.reflect.Trampoline",
 )
 
 # fx:controller 指定的控制器：FXML 反射注入 @FXML 字段、反射调用 onAction 方法

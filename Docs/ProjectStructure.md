@@ -81,7 +81,6 @@
 │   ├── ValidateScripts.ps1            脚本语法校验（范围见「开发约定」第 4 条）
 │   ├── GenerateNativeImageMetadata.py 生成 native-image 元数据（反射 / JNI / 资源，按产物存在性裁剪）
 │   ├── CompareScreenshots.py          对比两张截图判定文字抗锯齿类型（issue #20 的验收仪器）
-│   ├── FxmlLoadProbe.java             仅 CI 用：装载一次 FXML 后退出（供 tracing agent 采集运行期定义的类）
 │   └── Evidence/                       探查与验证产出（归档）
 └── Docs/                        技术文档（本目录）
     ├── README.md                     文档索引（导读与建议阅读路径）
@@ -108,7 +107,7 @@
 | `src/` | 应用源码（唯一进入 jar 的代码） | ✅ |
 | `Dist/` | 交付物：可分发文件夹（脚本 + fat jar） | —（承载产物）|
 | `Probe/` | 开发期探查与辅助工具（一次性排查 / 基准 / 校验） | ❌ |
-| `Script/` | 提权启动器 + 诊断工具（元数据生成 / 截图对比 / CI 采集探针）+ 探查产出归档 | ❌ |
+| `Script/` | 提权启动器 + 诊断工具（元数据生成 / 截图对比）+ 探查产出归档 | ❌ |
 | `Docs/` | 技术文档（[索引](README.md)） | ❌ |
 
 ---

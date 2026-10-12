@@ -245,6 +245,10 @@
                             <mainClass>${mainClass}</mainClass>
                             <imageName>LegionFanControl</imageName>
                             <buildArgs>
+                                <!-- 必须先解锁实验选项：下面用到的 -H:ExcludeResources 属于 experimental 参数
+                                     （只出现在 expert-options 列表里），而 GraalVM 按**参数顺序**判定是否已解锁，
+                                     放在后面会被判为「未解锁」。 -->
+                                <arg>-H:+UnlockExperimentalVMOptions</arg>
                                 <!-- 注意：原先的 no-fallback 开关已删除。GraalVM 现已取消 fallback 机制，
                                      该开关在 25.4 上会产生 deprecated / no effect / no replacement 告警；
                                      删后行为不变（编不出镜像依旧直接失败）。 -->
@@ -263,6 +267,17 @@
                                      连带 NativeLibLoader 的第①条路径中断、原生库永远加载不到 ——
                                      最终表现为「两条 Prism 管线都起不来」（详见第 5 节第 13 条）。 -->
                                 <arg>-H:+AddAllCharsets</arg>
+                                <!-- 关键修复（2026-10-12）：resource-config.json 里的 com/sun/javafx/.* 会把
+                                     com/sun/javafx/reflect/Trampoline.class 也当作**资源**编进镜像；而 JavaFX 的 MethodUtil
+                                     （一个私有 SecureClassLoader）正是靠 getResourceAsStream 读到这份字节，进而在**运行期**
+                                     defineClass —— native-image 禁止运行期定义类，于是原生包启动即崩：
+                                       UnsupportedFeatureError: Classes cannot be defined at runtime …
+                                       Tried to define class com.sun.javafx.reflect.Trampoline
+                                     排除这一个资源后，MethodUtil.findClass 会抛 ClassNotFoundException（它的 loadClass 会吞掉
+                                     该异常并回落到父加载器）⇒ 直接从镜像里取到该类（它已由 reflect-config.json 登记）。
+                                     这是让框架走它自己的正常回落路径，不是绕过：无需开 open world，也不增加镜像体积。
+                                     同一类问题的另一条路（-H:+RuntimeClassLoading / 预定义类）已证伪，见 Docs/NativeImageCi.md 第 5 节第 21 条。 -->
+                                <arg>-H:ExcludeResources=com/sun/javafx/reflect/Trampoline\.class</arg>
 
                                 <!-- Windows exe 清单：没有它，进程被判为「DPI 不感知」
                                      （整窗位图放大 → 字体发虚），且 Windows 会谎报系统版本
@@ -319,17 +334,6 @@
                                 <!-- 归因审计：打印「哪些类被在构建期初始化」。
                                      只影响构建日志，不改产物行为。
                                      日志由工作流保留，可直接判定是否存在构建期固化。 -->
-                                <!-- 2026-10-12 实验记录：JavaFX 装载 FXML 时会**运行期生成**
-                                     com.sun.javafx.reflect.Trampoline（绕模块访问限制），native-image 默认
-                                     禁止运行期定义类。试过 -H:+RuntimeClassLoading：能过这一关，但代价与
-                                     结果都不可接受 —— 镜像 102.2 → 156.9 MB、native-image 4m56s → 6m28s，
-                                     且随后运行期 VM 断言崩溃（Fatal error: Unable to call AOT method …
-                                     ClassLoader.getPlatformClassLoader / InterpreterUtil.shouldNotReachHere，
-                                     open world + 解释器混用不稳）。
-                                     改走定点方案：tracing agent 采集该类 ⇒ 预定义进镜像。
-                                     采集作业：.github/workflows/CollectPredefinedClasses.yml
-                                     说明见 Docs/NativeImageCi.md 第 5 节第 21 条。 -->
-                                <arg>-H:+UnlockExperimentalVMOptions</arg>
                                 <arg>-H:+PrintClassInitialization</arg>
                             </buildArgs>
                         </configuration>

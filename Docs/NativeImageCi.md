@@ -758,30 +758,46 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     规则：**FXML 里新增任何控件或布局类，都要同步加进生成器的 `FXML_UI_CLASSES`**，
     否则原生包会在启动时倒在这一步（JVM 模式不受影响，因为类路径上什么都有）。
 
-21. **JavaFX 会在运行期动态生成 `Trampoline` → 与 native-image「禁止运行期定义类」冲突（2026-10-12）**。
-    FXML 登记齐了之后，下一层是 JavaFX 自己的反射实现：它在反射调用某些成员时，会**在运行期生成**
-    `com.sun.javafx.reflect.Trampoline` 来绕过模块访问限制；而 native-image 默认不允许运行期定义类。
+21. **JavaFX 的 trampoline 被当成「资源」编进镜像 → 运行期仍去 defineClass（2026-10-12）**。
+    FXML 的登记齐了之后，最后一层来自 JavaFX 自己的反射工具：`com.sun.javafx.property.MethodHelper`
+    在**类初始化**阶段就要 `MethodUtil.getTrampolineModule()`，而 `MethodUtil`（一个私有
+    `SecureClassLoader`）会执行 `Class.forName("com.sun.javafx.reflect.Trampoline", true, new MethodUtil())`
+    —— 用私有加载器在**运行期**定义这个类。native-image 对自定义加载器只能委托、又默认禁止运行期定义类，
+    于是原生包启动即崩：
 
-    | 现象 | 原因 | 处置 |
-    |---|---|---|
-    | `UnsupportedFeatureError: Classes cannot be defined at runtime by default … Tried to define class 'com.sun.javafx.reflect.Trampoline'` | 运行期生成 Trampoline | **预定义该类**（本条目） |
-    | 紧接着 `Fatal error: Unable to call AOT method: … ClassLoader.getPlatformClassLoader` + `com.oracle.svm.interpreter.InterpreterUtil.shouldNotReachHere`（`EXCEPTION_ACCESS_VIOLATION`） | 试过 `-H:+RuntimeClassLoading`（错误文案里 “by default” 的那个开关，隐含 **open world**）：open world 与解释器混用在 GraalVM 25 上不稳 | **已证伪，不要再用**：exe 102.2 → 156.9 MB、native-image 4m56s → 6m28s，随后仍崩溃 |
+    ```
+    UnsupportedFeatureError: Classes cannot be defined at runtime by default …
+    Tried to define class 'com.sun.javafx.reflect.Trampoline'
+        at MethodUtil.defineClass(204) ← findClass(185) ← loadClass(157)
+    ```
 
-    定点解法：用 tracing agent 采集运行期定义的类，再预定义进镜像。
+    **根因**：本项目 `resource-config.json` 里的宽匹配 `com/sun/javafx/.*` 把
+    `com/sun/javafx/reflect/Trampoline.class` 也当作**资源**编进了镜像 ⇒ `MethodUtil.findClass`
+    能从 `getResourceAsStream` 读到这份字节 ⇒ 它才有机会去 `defineClass`。
 
-    | 步骤 | 做法 |
+    **修复**（`pom.xml` 的 native-image profile，紧随 `-H:+AddAllCharsets`）：
+
+    ```xml
+    <arg>-H:ExcludeResources=com/sun/javafx/reflect/Trampoline\.class</arg>
+    ```
+
+    为什么一条排除就够：资源被排除后，`MethodUtil.findClass` 抛 `ClassNotFoundException`，
+    而它自己的 `loadClass` 会**吞掉这个异常并回落到父加载器** ⇒ 直接从镜像里取到该类
+    （该类已由 `reflect-config.json` 登记，必然在镜像内）⇒ **完全不触发运行期定义类**。
+    这是 GraalVM 记录在案的开关（`-H:ExcludeResources`），不需要 open world，也不增加镜像体积。
+
+    | 试过并**已证伪**的两条路 | 失败证据 |
     |---|---|
-    | 采集 | `.github/workflows/CollectPredefinedClasses.yml`（手动 / push 限定文件触发）：只构建 fat jar，用 `Script/FxmlLoadProbe.java` 装载一次 FXML 后**优雅退出** |
-    | 三个必备条件 | ① 用 `-agentpath:` 显式指 agent 动态库（`-agentlib:` 在 Windows 上找不到库）；② 加 `--add-opens java.base/java.lang=ALL-UNNAMED` —— JVM 上 JavaFX 的 `defineClass` 会被模块访问挡住，**不加就采不到**；③ 必须优雅退出（agent 在关闭钩子里落盘，强杀进程会丢结果） |
-    | 入库 | `predefined-classes-config.json` 放进 `src/main/resources/META-INF/native-image/`，`<hash>.classdata` 放进其下的 `agent-extracted-predefined-classes/` 子目录（**层级不能压平**；native-image 按文件名自动识别清单，类数据则按此固定相对路径查找） |
-    | 规则 | 这两个文件是**采集产物**，不得手改；要更新就重跑采集作业，把新产物整体替换 |
+    | `-H:+RuntimeClassLoading`（错误文案里 “by default” 指的就是它，隐含 open world） | 能过当层，但随后 `Fatal error: Unable to call AOT method: … ClassLoader.getPlatformClassLoader` + `InterpreterUtil.shouldNotReachHere` / `EXCEPTION_ACCESS_VIOLATION`；且镜像 102.2 → 156.9 MB、构建 4m56s → 6m28s |
+    | tracing agent 预定义类（`predefined-classes-config.json` + `.classdata`） | 构建能过，但构建日志明说 `Skipped 1 predefined class(es) because the classpath already contains a class with the same name: com.sun.javafx.reflect.Trampoline`；运行期预定义表为空 ⇒ 仍落到 generic 报错。结论：**对「classpath 上已存在的类」无效**，相关链路已移除 |
 
-    > **只取定点所需的两个文件**：agent 同一次运行还产出了 120 KB 的 `reachability-metadata.json`，
-    > **不入库** —— 本项目已有手写 + 生成器维护的三份元数据，混入采集品会让「元数据来源」这条线失焦。
-    >
-    > 采集结果（2026-10-12，GraalVM 25.4 / JDK 25）：清单 1 项
-    > （`com/sun/javafx/reflect/Trampoline`，hash `h4Emrly5Eh7pTrttmQosxK`），字节 1566。
+    | 保证项 | 内容 |
+    |---|---|
+    | 自证③ | `reflect-config.json` 必须含 `com.sun.javafx.reflect.Trampoline`（含 `invoke` 方法条目）—— 它是「回落父加载器能否成功」的前提，删了就退回崩溃 |
+    | 冒烟 | 必须命中 `[ui-fxml-loaded]`：命中即证明整条 FXML 链路（登记 → 资源 → 反射 → trampoline 回落）在原生镜像里打通 |
 
+    > **教训**：`com/sun/javafx/.*` 这类**宽匹配资源登记**会把 `.class` 也编进去，从而改变框架
+    > 自身的类加载路径 —— 宽匹配必须配一条精确排除，否则会引出「构建全绿、运行即崩」的问题。
 
 ---
 
