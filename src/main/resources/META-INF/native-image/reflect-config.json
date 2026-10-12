@@ -465,7 +465,11 @@
           "java.lang.Object[]"
         ]
       }
-    ]
+    ],
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "com.sun.javafx.scene.control.skin.Utils",
@@ -2449,6 +2453,13 @@
     "allDeclaredFields": true
   },
   {
+    "name": "javafx.collections.ObservableList",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "javafx.css.CssParser",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
@@ -2689,7 +2700,11 @@
     "allDeclaredClasses": true
   },
   {
-    "name": "javafx.scene.layout.Pane"
+    "name": "javafx.scene.layout.Pane",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.layout.Priority",

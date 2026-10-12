@@ -738,7 +738,12 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     | fxml / css 资源 | `resource-config.json` 里的 `io/github/acnxo/legion/fan/.*\\.fxml$` 与 `.*\\.css$` | 运行期 `getResource` 为 null ⇒ 「界面加载失败」 |
     | 控制器 + FXML 用到的控件 / 布局类 + **FXMLLoader 自身** | `reflect-config.json`（生成器里的 `FXML_UI_CLASSES` / `CONTROLLER_CLASS`） | FXMLLoader 按类名实例化 / 注入 `@FXML` 字段失败 ⇒ 「界面加载失败」 |
 
-    > **实测踩到的那一个（2026-10-12，冒烟正面断言抓到）**：`FXMLLoader.<clinit>` 内部会
+    > **实测踩到的第二处（2026-10-12）**：FXML 处理 `<children>` 时反射调用的是
+    > `javafx.scene.layout.Pane.getChildren()` —— 而 `HBox` 虽已 `allDeclared*`，**继承来的方法
+    > 是按父类解析的**，父类条目不会被子类条目覆盖 ⇒ 报 `MissingReflectionRegistrationError:
+    > Cannot reflectively invoke method Pane.getChildren()`。故父类（`Pane`）也必须是 `allDeclared*`。
+    >
+    > **实测踩到的第一处（2026-10-12，冒烟正面断言抓到）**：`FXMLLoader.<clinit>` 内部会
     > `Utils.forceInit("javafx.fxml.FXMLLoader")` —— **按名字加载**，封闭世界分析看不到 ⇒ 类被裁掉，
     > 原生包启动即 `AssertionError: ClassNotFoundException: javafx.fxml.FXMLLoader`（JVM 模式却正常）。
     > 因此 `javafx.fxml.FXMLLoader`（及控制器用到的 `javafx.fxml.FXML` 注解）**必须**在登记表里 ——

@@ -142,6 +142,12 @@ FXML_UI_CLASSES = (
     "javafx.scene.control.Button",
     "javafx.scene.layout.GridPane",
     "javafx.scene.layout.HBox",
+    # Pane 是 HBox/GridPane 的父类，而 FXMLLoader 处理 <children> 时是按 Pane 解析
+    # getChildren() 的；父类条目不会被子类条目覆盖，必须单独登记。
+    # 2026-10-12 实测：漏了它 ⇒ MissingReflectionRegistrationError: Pane.getChildren()。
+    "javafx.scene.layout.Pane",
+    # getChildren() 的返回值，FXML 继续往集合里 add 子节点。
+    "javafx.collections.ObservableList",
     "javafx.scene.layout.ColumnConstraints",
     # FXML 反射调用的成员分散在**祖先类**上：getId/setId/getStyleClass 在 Node，
     # setMaxWidth/setPrefWidth 在 Region，setWrapText/setText 在 Labeled ——
