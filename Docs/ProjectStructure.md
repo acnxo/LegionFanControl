@@ -85,7 +85,7 @@
     ├── NativeImageCi.md              原生镜像 CI 与发布（触发 / 工具链 / tag 规则 / 踩坑）
     ├── DevLog/                       开发过程日志（内部工作记忆脱敏导出）
     └── Asset/                        文档配图
-        └── IMG/UI-Main.png               界面截图（占位）
+        └── IMG/UI-Main.png               界面截图
 ```
 
 > `target/` 为构建产物，不纳入版本管理；`Probe/` 下的工具不参与打包（不在 `src/` 下）。

@@ -19,7 +19,7 @@ Docs/
 ├── DevSpec/                      开发规范（文档命名与格式规范）
 ├── DevLog/                       开发过程日志（内部工作记忆脱敏导出，append-only）
 └── Asset/                        文档配图
-    └── IMG/UI-Main.png               界面截图（占位）
+    └── IMG/UI-Main.png               界面截图
 ```
 
 ---
