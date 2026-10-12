@@ -139,10 +139,45 @@ FXML_UI_CLASSES = (
     "javafx.fxml.FXMLLoader",
     "javafx.fxml.FXML",
     "javafx.scene.control.Label",
+    # setOnAction 声明在 ButtonBase（Button 的父类）上，FXML 绑定 onAction 时按它解析。
+    # 2026-10-12 实测：只登记 Button ⇒ MissingReflectionRegistrationError: ButtonBase.setOnAction。
+    "javafx.scene.control.ButtonBase",
+    # onAction 的形参类型（事件处理器的接口）。
+    "javafx.event.EventHandler",
     "javafx.scene.control.Button",
     "javafx.scene.layout.GridPane",
     "javafx.scene.layout.HBox",
+    # Pane 是 HBox/GridPane 的父类，而 FXMLLoader 处理 <children> 时是按 Pane 解析
+    # getChildren() 的；父类条目不会被子类条目覆盖，必须单独登记。
+    # 2026-10-12 实测：漏了它 ⇒ MissingReflectionRegistrationError: Pane.getChildren()。
+    "javafx.scene.layout.Pane",
+    # getChildren() 的返回值，FXML 继续往集合里 add 子节点。
+    "javafx.collections.ObservableList",
     "javafx.scene.layout.ColumnConstraints",
+    # FXML 反射调用的成员分散在**祖先类**上：getId/setId/getStyleClass 在 Node，
+    # setMaxWidth/setPrefWidth 在 Region，setWrapText/setText 在 Labeled ——
+    # allDeclaredMethods 只覆盖本类声明的成员，父类必须单独登记（并且自身也要 allDeclared*）。
+    # 2026-10-12 实测：只登记控件类，原生包报 MissingReflectionRegistrationError: Node.getId()。
+    "javafx.scene.Node",
+    "javafx.scene.Parent",
+    "javafx.scene.layout.Region",
+    "javafx.scene.control.Control",
+    "javafx.scene.control.Labeled",
+    # FXML 属性里的枚举：alignment="CENTER" → Pos.valueOf，hgrow="ALWAYS" → Priority.valueOf
+    "javafx.geometry.Pos",
+    "javafx.scene.layout.Priority",
+    # FXMLLoader 解析 fxml 走 StAX：javax.xml.stream.XMLInputFactory.newInstance() 会用
+    # Class.forName 找 JDK 内部实现（FactoryFinder），该实现必须登记才进镜像，
+    # 否则报 javax.xml.stream.FactoryConfigurationError: Provider … not found
+    # （2026-10-12 实测，见 Docs/NativeImageCi.md 第 5 节第 21 条）。
+    "com.sun.xml.internal.stream.XMLInputFactoryImpl",
+    # JavaFX 的反射工具类会在运行期用**自己的私有 SecureClassLoader** 定义 Trampoline
+    # （字节码是 javafx 模块里的一份资源）。native-image 禁止运行期定义类，报：
+    #   UnsupportedFeatureError: Classes cannot be defined at runtime … Tried to define class
+    # 但 Class.forName 在镜像里是先查 AOT 类注册表的：只要这个类**被编进镜像**，
+    # 就根本不会走到私有加载器 ⇒ 登记即强制包含，运行期不再定义。
+    # 2026-10-12 实测：登记前启动即崩（栈见 Docs/NativeImageCi.md 第 5 节第 21 条），登记后冒烟通过。
+    "com.sun.javafx.reflect.Trampoline",
 )
 
 # fx:controller 指定的控制器：FXML 反射注入 @FXML 字段、反射调用 onAction 方法

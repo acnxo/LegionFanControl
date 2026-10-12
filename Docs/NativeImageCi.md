@@ -738,7 +738,17 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     | fxml / css 资源 | `resource-config.json` 里的 `io/github/acnxo/legion/fan/.*\\.fxml$` 与 `.*\\.css$` | 运行期 `getResource` 为 null ⇒ 「界面加载失败」 |
     | 控制器 + FXML 用到的控件 / 布局类 + **FXMLLoader 自身** | `reflect-config.json`（生成器里的 `FXML_UI_CLASSES` / `CONTROLLER_CLASS`） | FXMLLoader 按类名实例化 / 注入 `@FXML` 字段失败 ⇒ 「界面加载失败」 |
 
-    > **实测踩到的那一个（2026-10-12，冒烟正面断言抓到）**：`FXMLLoader.<clinit>` 内部会
+    > **规则（两次实测总结）**：FXML 反射访问成员时按**声明类**解析 —— 属性 `maxWidth` 声明在
+    > `Region`、`text`/`wrapText` 在 `Labeled`、`setOnAction` 在 `ButtonBase`、`getChildren` 在 `Parent`/`Pane`。
+    > 因此「FXML 里出现的每个属性」对应的**声明类**都必须 `allDeclared*`；给子类（`Button`/`HBox`）登记
+    > **不能**覆盖父类的成员。
+    >
+    > **实测踩到的第二处（2026-10-12）**：FXML 处理 `<children>` 时反射调用的是
+    > `javafx.scene.layout.Pane.getChildren()` —— 而 `HBox` 虽已 `allDeclared*`，**继承来的方法
+    > 是按父类解析的**，父类条目不会被子类条目覆盖 ⇒ 报 `MissingReflectionRegistrationError:
+    > Cannot reflectively invoke method Pane.getChildren()`。故父类（`Pane`）也必须是 `allDeclared*`。
+    >
+    > **实测踩到的第一处（2026-10-12，冒烟正面断言抓到）**：`FXMLLoader.<clinit>` 内部会
     > `Utils.forceInit("javafx.fxml.FXMLLoader")` —— **按名字加载**，封闭世界分析看不到 ⇒ 类被裁掉，
     > 原生包启动即 `AssertionError: ClassNotFoundException: javafx.fxml.FXMLLoader`（JVM 模式却正常）。
     > 因此 `javafx.fxml.FXMLLoader`（及控制器用到的 `javafx.fxml.FXML` 注解）**必须**在登记表里 ——
@@ -757,6 +767,65 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
 
     规则：**FXML 里新增任何控件或布局类，都要同步加进生成器的 `FXML_UI_CLASSES`**，
     否则原生包会在启动时倒在这一步（JVM 模式不受影响，因为类路径上什么都有）。
+
+21. **JavaFX 的 trampoline 被当成「资源」编进镜像 → 运行期仍去 defineClass（2026-10-12）**。
+    FXML 的登记齐了之后，最后一层来自 JavaFX 自己的反射工具：`com.sun.javafx.property.MethodHelper`
+    在**类初始化**阶段就要 `MethodUtil.getTrampolineModule()`，而 `MethodUtil`（一个私有
+    `SecureClassLoader`）会执行 `Class.forName("com.sun.javafx.reflect.Trampoline", true, new MethodUtil())`
+    —— 用私有加载器在**运行期**定义这个类。native-image 对自定义加载器只能委托、又默认禁止运行期定义类，
+    于是原生包启动即崩：
+
+    ```
+    UnsupportedFeatureError: Classes cannot be defined at runtime by default …
+    Tried to define class 'com.sun.javafx.reflect.Trampoline'
+        at MethodUtil.defineClass(204) ← findClass(185) ← loadClass(157)
+    ```
+
+    **根因**：本项目 `resource-config.json` 里的宽匹配 `com/sun/javafx/.*` 把
+    `com/sun/javafx/reflect/Trampoline.class` 也当作**资源**编进了镜像 ⇒ `MethodUtil.findClass`
+    能从 `getResourceAsStream` 读到这份字节 ⇒ 它才有机会去 `defineClass`。
+
+    **修复**（`resource-config.json`：给宽匹配配一条精确排除；JSON 自带的 `excludes` 不经命令行、
+    不受参数转义影响，比 `-H:ExcludeResources` 稳）：
+
+    ```json
+    {
+      "resources": {
+        "includes": [ "…（原有条目不动）" ],
+        "excludes": [ { "pattern": "com/sun/javafx/reflect/Trampoline\\.class" } ]
+      }
+    }
+    ```
+
+    为什么一条排除就够：资源被排除后，`MethodUtil.findClass` 抛 `ClassNotFoundException`，
+    而它自己的 `loadClass` 会**吞掉这个异常并回落到父加载器** ⇒ 直接从镜像里取到该类
+    （该类已由 `reflect-config.json` 登记，必然在镜像内）⇒ **完全不触发运行期定义类**。
+    不需要 open world，也不增加镜像体积。
+
+    | 本机实验（GraalVM 25，最小复现） | 结论 |
+    |---|---|
+    | 不做任何资源登记 | `.class` 与普通文件**都不可见** ⇒ `.class` 不会被自动当资源编进镜像 |
+    | 只做反射登记（不含资源规则） | `.class` **仍不可见** ⇒ 反射登记也不会顺带带上 `.class` 资源 |
+    | `resource-config.json` 登记 `R\.class` | 可见 ⇒ 资源登记生效（本问题的**唯一来源**） |
+    | `-H:ExcludeResources=R.class` | 可排除（命令行方式有效） |
+    | JSON 里的 `excludes` | 也可排除（**本修复采用的方式**） |
+
+    > 命令行 `-H:ExcludeResources=…Trampoline\.class` 在 CI 上实测**未生效**（同一份配置在本机
+    > 用命令行可排除、用 JSON 可排除，说明问题出在参数传递/转义链路上，而非机制本身）；
+    > 因此改用 JSON `excludes`。这类「宽匹配 + 精确排除」的登记请一律写在 JSON 里。
+    | 试过并**已证伪**的两条路 | 失败证据 |
+    |---|---|
+    | `-H:+RuntimeClassLoading`（错误文案里 “by default” 指的就是它，隐含 open world） | 能过当层，但随后 `Fatal error: Unable to call AOT method: … ClassLoader.getPlatformClassLoader` + `InterpreterUtil.shouldNotReachHere` / `EXCEPTION_ACCESS_VIOLATION`；且镜像 102.2 → 156.9 MB、构建 4m56s → 6m28s |
+    | tracing agent 预定义类（`predefined-classes-config.json` + `.classdata`） | 构建能过，但构建日志明说 `Skipped 1 predefined class(es) because the classpath already contains a class with the same name: com.sun.javafx.reflect.Trampoline`；运行期预定义表为空 ⇒ 仍落到 generic 报错。结论：**对「classpath 上已存在的类」无效**，相关链路已移除 |
+
+    | 保证项 | 内容 |
+    |---|---|
+    | 自证③ | `reflect-config.json` 必须含 `com.sun.javafx.reflect.Trampoline`（含 `invoke` 方法条目）—— 它是「回落父加载器能否成功」的前提，删了就退回崩溃 |
+    | 冒烟 | 必须命中 `[ui-fxml-loaded]`：命中即证明整条 FXML 链路（登记 → 资源 → 反射 → trampoline 回落）在原生镜像里打通 |
+    | 诊断标记 | 启动时打印 `[diag-trampoline-resource]`：**应为 `null`**；若是 `visible`，说明排除又失效了，会上演同一场崩溃 |
+
+    > **教训**：`com/sun/javafx/.*` 这类**宽匹配资源登记**会把 `.class` 也编进去，从而改变框架
+    > 自身的类加载路径 —— 宽匹配必须配一条精确排除，否则会引出「构建全绿、运行即崩」的问题。
 
 ---
 

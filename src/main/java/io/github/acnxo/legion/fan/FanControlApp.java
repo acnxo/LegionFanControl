@@ -50,10 +50,37 @@ public class FanControlApp extends Application {
         launch(args);
     }
 
+    /**
+     * 诊断（只打日志）：JavaFX 的反射工具 {@code com.sun.javafx.property.MethodHelper} →
+     * {@code com.sun.javafx.reflect.MethodUtil}（一个私有 {@code SecureClassLoader}）会读取
+     * {@code com/sun/javafx/reflect/Trampoline.class} 这份**资源**，再在**运行期** {@code defineClass}；
+     * 而 native-image 默认禁止运行期定义类，于是原生包启动即崩。
+     *
+     * <p>因此这份资源必须被排除（见 {@code resource-config.json} 的 {@code excludes}）：资源不可见时，
+     * {@code MethodUtil.findClass} 会抛 {@code ClassNotFoundException}，它自己的 {@code loadClass}
+     * 会吞掉该异常并回落到父加载器，从而直接从镜像里取到该类（反射表已登记）—— 完全不触发运行期定义。
+     *
+     * <p>这一行是**纯 ASCII 标记**，让 CI 与真机都能一眼判定排除是否生效（{@code null} 才是对的），
+     * 详见 {@code Docs/NativeImageCi.md} 第 5 节第 21 条。
+     */
+    private static void logTrampolineDiagnostics() {
+        String visibility;
+        try (InputStream in = FanControlApp.class.getModule()
+                .getResourceAsStream("com/sun/javafx/reflect/Trampoline.class")) {
+            visibility = (in == null) ? "null" : "visible";
+        } catch (IOException | RuntimeException e) {
+            visibility = "error(" + e.getClass().getSimpleName() + ")";
+        }
+        System.out.println("[diag-trampoline-resource] " + visibility
+                + "（期望 null：资源被排除后 JavaFX 会回落到父加载器，不再运行期定义类）");
+        System.out.flush();
+    }
+
     @Override
     public void start(Stage stage) {
         // 渲染诊断：只打日志，不改渲染行为。用于对照原生镜像与 JVM 模式的字体渲染差异（issue #20）
         RenderDiagnostics.log();
+        logTrampolineDiagnostics();
 
         FanControlController controller;
         Parent root;

@@ -465,7 +465,11 @@
           "java.lang.Object[]"
         ]
       }
-    ]
+    ],
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "com.sun.javafx.scene.control.skin.Utils",
@@ -2421,6 +2425,13 @@
     "allDeclaredFields": true
   },
   {
+    "name": "com.sun.xml.internal.stream.XMLInputFactoryImpl",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "io.github.acnxo.legion.fan.FanControlApp",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true
@@ -2440,6 +2451,13 @@
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
+  },
+  {
+    "name": "javafx.collections.ObservableList",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.css.CssParser",
@@ -2499,6 +2517,13 @@
     "allDeclaredFields": true
   },
   {
+    "name": "javafx.event.EventHandler",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "javafx.fxml.FXML",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
@@ -2507,6 +2532,13 @@
   },
   {
     "name": "javafx.fxml.FXMLLoader",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
+    "name": "javafx.geometry.Pos",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true,
@@ -2543,13 +2575,21 @@
     "allDeclaredFields": true
   },
   {
-    "name": "javafx.scene.Node"
+    "name": "javafx.scene.Node",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.ParallelCamera"
   },
   {
-    "name": "javafx.scene.Parent"
+    "name": "javafx.scene.Parent",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.PerspectiveCamera",
@@ -2592,7 +2632,18 @@
     "allDeclaredClasses": true
   },
   {
-    "name": "javafx.scene.control.Control"
+    "name": "javafx.scene.control.ButtonBase",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
+    "name": "javafx.scene.control.Control",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.control.Label",
@@ -2602,7 +2653,11 @@
     "allDeclaredClasses": true
   },
   {
-    "name": "javafx.scene.control.Labeled"
+    "name": "javafx.scene.control.Labeled",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.control.TableColumnBase",
@@ -2659,10 +2714,25 @@
     "allDeclaredClasses": true
   },
   {
-    "name": "javafx.scene.layout.Pane"
+    "name": "javafx.scene.layout.Pane",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
-    "name": "javafx.scene.layout.Region"
+    "name": "javafx.scene.layout.Priority",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
+    "name": "javafx.scene.layout.Region",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.paint.Color",

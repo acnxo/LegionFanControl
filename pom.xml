@@ -245,6 +245,10 @@
                             <mainClass>${mainClass}</mainClass>
                             <imageName>LegionFanControl</imageName>
                             <buildArgs>
+                                <!-- 必须先解锁实验选项：下面用到的 -H:ExcludeResources 属于 experimental 参数
+                                     （只出现在 expert-options 列表里），而 GraalVM 按**参数顺序**判定是否已解锁，
+                                     放在后面会被判为「未解锁」。 -->
+                                <arg>-H:+UnlockExperimentalVMOptions</arg>
                                 <!-- 注意：原先的 no-fallback 开关已删除。GraalVM 现已取消 fallback 机制，
                                      该开关在 25.4 上会产生 deprecated / no effect / no replacement 告警；
                                      删后行为不变（编不出镜像依旧直接失败）。 -->
@@ -319,7 +323,6 @@
                                 <!-- 归因审计：打印「哪些类被在构建期初始化」。
                                      只影响构建日志，不改产物行为。
                                      日志由工作流保留，可直接判定是否存在构建期固化。 -->
-                                <arg>-H:+UnlockExperimentalVMOptions</arg>
                                 <arg>-H:+PrintClassInitialization</arg>
                             </buildArgs>
                         </configuration>
