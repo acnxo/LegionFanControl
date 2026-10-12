@@ -132,6 +132,12 @@ PROBE_REFLECT_CLASSES = [
 # 规则：FXML 里新增任何控件 / 布局类，都必须加到这里（详见 Docs/NativeImageCi.md 第 5 节第 20 条）。
 # ---------------------------------------------------------------------------
 FXML_UI_CLASSES = (
+    # FXMLLoader 自身是**按名字加载**的：FXMLLoaderHelper.<clinit> 会
+    # Utils.forceInit("javafx.fxml.FXMLLoader") —— 不登记就会被封闭世界分析裁掉，
+    # 原生包里表现为启动即 AssertionError: ClassNotFoundException: javafx.fxml.FXMLLoader
+    # （2026-10-12 冒烟正面断言抓到，见 Docs/NativeImageCi.md 第 5 节第 20 条）。
+    "javafx.fxml.FXMLLoader",
+    "javafx.fxml.FXML",
     "javafx.scene.control.Label",
     "javafx.scene.control.Button",
     "javafx.scene.layout.GridPane",
