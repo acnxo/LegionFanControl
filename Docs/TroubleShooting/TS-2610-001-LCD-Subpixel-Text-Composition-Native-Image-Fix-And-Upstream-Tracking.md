@@ -296,3 +296,4 @@ python Script\CompareScreenshots.py 原生.png JVM.png --label-a 原生 --label-
 | 复现工程 | [`acnxo/LCDSubpixelMinimalReproduction`](https://github.com/acnxo/LCDSubpixelMinimalReproduction) | 最小复现代码与矩阵编译产物 |
 | 复现工程档案 | [TS-2610-001（复现仓库）](https://github.com/acnxo/LCDSubpixelMinimalReproduction/blob/dev/Docs/TroubleShooting/TS-2610-001-LcdSubpixel-TextComposition-Degradation-Under-GraalVm-NativeImage.md) | 复现侧的完整证据与行为模型（该仓库尚未按本仓库的命名规范重命名，链接按其现状） |
 | 本仓库规范 | [DevSpec/TroubleShootingDocSpec.md](../DevSpec/TroubleShootingDocSpec.md) | 本目录的命名与格式规范（本档案即按此规范命名） |
+| `Docs/TroubleShooting/TS-2610-003-FXML-UI-Refactor-And-Native-Image-Reflection-Pitfalls.md` | 同目录另一份档案（同为 native-image 相关，但归属本仓库配置缺陷：FXML 反射登记与资源排除） |

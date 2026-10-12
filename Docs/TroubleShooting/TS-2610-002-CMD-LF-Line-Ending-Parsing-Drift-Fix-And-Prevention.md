@@ -296,3 +296,4 @@ $b = [IO.File]::ReadAllBytes('Bootstrap.cmd')
 | `Docs/TroubleShooting/TS-2610-001-LCD-Subpixel-Text-Composition-Native-Image-Fix-And-Upstream-Tracking.md` | 同目录的另一份故障档案（原生包文本渲染退化） |
 | `Docs/DevSpec/TroubleShootingDocSpec.md` | 本目录的命名与格式规范（本档案即按此规范命名） |
 | `Dist/Bootstrap.cmd` | 受影响文件，其文件头注释即本约定的原始出处 |
+| `Docs/TroubleShooting/TS-2610-003-FXML-UI-Refactor-And-Native-Image-Reflection-Pitfalls.md` | 同目录另一份档案（同为「缺陷不可见 ⇒ 机器强制」的思路：原生包启动即崩与 FXML 反射 / 资源排除） |
