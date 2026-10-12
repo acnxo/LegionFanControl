@@ -13,6 +13,13 @@ name: CollectPredefinedClasses
 
 on:
   workflow_dispatch:
+  # 说明：GitHub 只在**默认分支**上暴露 workflow_dispatch，本作业又是随功能分支新增的，
+  # 因此额外挂一个 push 触发器（限定采集链路的两个文件）——改这两个文件即自动重采，
+  # 合并到默认分支后可直接用界面/gh 手动触发。
+  push:
+    paths:
+      - 'Script/FxmlLoadProbe.java'
+      - '.github/workflows/CollectPredefinedClasses.yml'
 
 permissions:
   contents: read
