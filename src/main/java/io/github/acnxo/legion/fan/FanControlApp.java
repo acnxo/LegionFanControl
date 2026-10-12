@@ -110,7 +110,7 @@ public class FanControlApp extends Application {
         // 窗口初始 600×360：容纳「01-左风扇转速[CPU侧]」这类较长标注而不被截断，
         // 同时给状态栏留出足够的横向余量；状态栏的宽度上限随窗口自适应（见控制器 initialize()）。
         stage.setScene(new Scene(root, 600, 360));
-        stage.setTitle("Legion风扇控制 V0.3.1");
+        stage.setTitle("Legion风扇控制 V0.4.0");
         // 窗口与任务栏图标：与 exe 的文件图标同一张图（见 Docs/Asset/README.md）。
         // 图标是外观项：缺失或加载失败都不应影响启动，因此只记一行、不向上抛。
         try (InputStream logo = FanControlApp.class.getResourceAsStream("/Asset/Logo.png")) {
