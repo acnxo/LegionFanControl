@@ -233,7 +233,7 @@ public final class FanControlService {
     }
 
     /** 在短命线程上跑一次桥接调用，把结果或异常分别交给两个回调。 */
-    private void runAsync(String threadName, BridgeCall call, IntConsumer onSuccess, Consumer<String> onFailure) {
+    private void runAsync(String threadName, BridgeCall call, IntConsumer onSuccess, Consumer<Exception> onFailure) {
         Thread t = new Thread(() -> {
             try {
                 int rc = call.get();
