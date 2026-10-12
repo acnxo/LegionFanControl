@@ -14,8 +14,10 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -114,6 +116,12 @@ public class FanControlApp extends Application {
         grid.setHgap(20);
         grid.setVgap(15);
         grid.setPadding(new Insets(20));
+        // 列宽策略：第 1 列（标题）保持内容宽度，第 2 列吃掉多余空间 —— 窗口变宽时，
+        // 跨两列的「状态栏」与「按钮」跟着变宽，而标题与数值的相对位置不变。
+        ColumnConstraints titleColumn = new ColumnConstraints();
+        ColumnConstraints valueColumn = new ColumnConstraints();
+        valueColumn.setHgrow(Priority.ALWAYS);
+        grid.getColumnConstraints().addAll(titleColumn, valueColumn);
 
         fan1Value = addRow(grid, 0, FAN1_LABEL);
         fan2Value = addRow(grid, 1, FAN2_LABEL);
@@ -129,12 +137,26 @@ public class FanControlApp extends Application {
 
         statusValue = new Label();
         statusValue.setWrapText(true);
+        // 自适应：允许被拉宽到所在单元格（跨两列）的宽度；两侧留白由 grid 的 20px 内边距保证（> 15px）。
+        statusValue.setMaxWidth(Double.MAX_VALUE);
+        GridPane.setHgrow(statusValue, Priority.ALWAYS);
         GridPane.setColumnSpan(statusValue, 2);
         grid.add(statusValue, 0, 6);
 
+        // 最小宽度 = 当前布局实际分配给状态栏的宽度 × 1.2（要求：比目前扩大 20%）。
+        // 40 = grid 左右各 20px 的内边距；此刻状态栏文本为空，算出的宽度由其余各行决定。
+        double statusWidthBefore = Math.max(grid.prefWidth(-1) - 40, 0);
+        statusValue.setMinWidth(Math.round(statusWidthBefore * 1.2));
+        System.out.println("窗口布局：状态栏最小宽度 = " + Math.round(statusWidthBefore * 1.2)
+                + " px（原 " + Math.round(statusWidthBefore) + " px 的 1.2 倍），宽度上限随窗口自适应");
+
         HBox root = new HBox(grid);
         root.setAlignment(Pos.CENTER);
-        // 宽度 470：容纳「风扇 1 转速（左 / CPU 侧，推测）」这类较长标注而不被截断
+        // 让 grid 随窗口一起伸缩（否则 HBox 只按 grid 的首选宽度居中摆放，窗口拉宽时内容不变宽）。
+        grid.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(grid, Priority.ALWAYS);
+        // 窗口初始 600×360：容纳「风扇 1 转速（左 / CPU 侧，推测）」这类较长标注而不被截断，
+        // 同时给状态栏留出足够的横向余量。
         stage.setScene(new Scene(root, 600, 360));
         stage.setTitle("Legion风扇控制 V0.3.1");
         // 窗口与任务栏图标：与 exe 的文件图标同一张图（见 Docs/Asset/README.md）。
