@@ -147,3 +147,37 @@ LegionFanControl-0.2.0.00057-native-windows-x64.zip
 - 包内文件名**不带**版本号 / 编号段 —— 升级脚本（`UpdateNative.ps1` / `UpdateJvm.ps1`）与 `Bootstrap.cmd` 都按固定名定位；
 - 升级脚本用**递归查找**（`Get-ChildItem -Recurse -Filter`）定位本体，因此对「带目录的新包」与「平铺的旧包」都能升级；
 - 由 `publish` 作业的 `PackageZip` 现场重打（JVM 包在 build 作业里先按纯版本号打好，编号段只有 `publish` 才知道 ⇒ 那里解开后重打），并有自证：**顶层有且只有一个目录、且与 zip 同名**、关键文件名必须是固定名。
+
+## 11. 第三方构件的版本集中定义在 `<properties>`，pom 里一律用 `${...}` 引用
+
+```xml
+<!-- 正确：版本只有一处来源 -->
+<properties>
+    <javafx.version>27</javafx.version>
+    <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+</properties>
+<dependency>
+    <artifactId>javafx-base</artifactId>
+    <version>${javafx.version}</version>
+</dependency>
+
+<!-- 错误：版本散落在依赖 / 插件声明里，升级时容易只改一半，且构建期完全看不出来 -->
+<dependency>
+    <artifactId>javafx-base</artifactId>
+    <version>27</version>
+</dependency>
+```
+
+适用范围：`<dependency>` 与 `<plugin>`（含 `profile` 内的插件）。
+不在此列：项目自身版本（顶层 `<version>`）、`<parent>` 的版本。
+
+理由：同一个构件出现两处版本时，构建期不会报错，只会在某个环境上悄悄解析到旧版本；
+集中定义后升级只改一处，评审时一眼可见。
+
+### 机器强制（2026-10-12 起）
+
+| 项 | 内容 |
+|---|---|
+| 检查脚本 | `Script/CheckPomVersions.py`（纯文本扫描，不联网、秒级） |
+| 护栏工作流 | `.github/workflows/CheckPomVersions.yml`（改动 `pom.xml` 或该脚本时自动运行，发现硬编码版本即失败） |
+| 自测 | 对改造后的 `pom.xml` 通过 ✅；对故意写死的版本正确报错并给出行号 ✅ |

@@ -19,6 +19,15 @@
              原生编译收敛在 native-image profile 内，默认 jar 打包不受影响。 -->
         <maven.compiler.release>25</maven.compiler.release>
         <javafx.version>27</javafx.version>
+        <!-- 第三方构件的版本一律集中在此处定义，并在 dependencies / build / profiles 里用
+             ${...} 引用：版本只有单一来源，升级时只改这里。
+             pom.xml 里任何 dependency / plugin 直接写死版本，都会被
+             Script/CheckPomVersions.py 挡下（开发约定第 11 条）。 -->
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+        <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+        <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
+        <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
+        <native-maven-plugin.version>1.1.14</native-maven-plugin.version>
         <!-- 入口必须是不继承 javafx.application.Application 的普通类。
              若把继承 Application 的类直接作为 Main-Class，Java 启动器会强制
              走模块化 JavaFX 运行时检查，非模块化 jar 将报「缺少 JavaFX 运行时组件」。 -->
@@ -107,13 +116,13 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.16.0</version>
+                <version>${maven-compiler-plugin.version}</version>
             </plugin>
             <!-- JVM 模式调试运行：mvn javafx:run（需管理员终端） -->
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
+                <version>${javafx-maven-plugin.version}</version>
                 <configuration>
                     <mainClass>${mainClass}</mainClass>
                 </configuration>
@@ -141,7 +150,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.2</version>
+                <version>${maven-shade-plugin.version}</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -187,7 +196,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
-                <version>3.5.0</version>
+                <version>${maven-resources-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>copy-fat-jar-to-dist</id>
@@ -240,7 +249,7 @@
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
-                        <version>1.1.14</version>
+                        <version>${native-maven-plugin.version}</version>
                         <configuration>
                             <mainClass>${mainClass}</mainClass>
                             <imageName>LegionFanControl</imageName>

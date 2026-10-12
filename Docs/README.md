@@ -10,7 +10,7 @@
 Docs/
 ├── README.md                     本文件（文档索引与阅读路径）
 ├── TechnicalPrinciples.md        技术原理（架构 / 性能 / WMI 接口 / 踩坑）
-├── DevelopmentConventions.md     开发约定（10 条硬性约定）
+├── DevelopmentConventions.md     开发约定（11 条硬性约定）
 ├── UserInterface.md              界面说明（显示项 / 按钮状态 / 状态栏 / 读数约定）
 ├── ProjectStructure.md           项目结构（项目概况 / 目录职责 / 构建机制）
 ├── LimitationsAndRoadmap.md      已知限制与路线图（能力边界 / 待办）
@@ -29,7 +29,7 @@ Docs/
 | 文档 | 内容 | 什么时候看 |
 |---|---|---|
 | [TechnicalPrinciples.md](TechnicalPrinciples.md) | **技术原理** —— 整体架构、**管理员权限与两层提权保障**、为何用 PowerShell 子进程、批量快照（性能关键设计）、WMI 类与方法清单、CapabilityID 读取通路与降级链、满速写入三通路、属性名踩坑记录、风扇方位标注的证据链与置信度 | 想搞清某个数值从哪来；准备改桥接层 |
-| [DevelopmentConventions.md](DevelopmentConventions.md) | **开发约定** —— 10 条全部由实际踩坑换来的硬性约定（Launcher 入口、`module-info` 排除、XML 注释禁双横线、脚本语法校验、**`.cmd` 必须 CRLF（已由 `.gitattributes` + CI 自证机器强制）**、产物名不带版本号、发布 zip 内自带同名目录等） | **动手改代码或构建配置之前——必读** |
+| [DevelopmentConventions.md](DevelopmentConventions.md) | **开发约定** —— 11 条全部由实际踩坑换来的硬性约定（Launcher 入口、`module-info` 排除、XML 注释禁双横线、脚本语法校验、**`.cmd` 必须 CRLF（已由 `.gitattributes` + CI 自证机器强制）**、产物名不带版本号、发布 zip 内自带同名目录、**第三方构件版本集中在 `<properties>`** 等） | **动手改代码或构建配置之前——必读** |
 | [UserInterface.md](UserInterface.md) | **界面说明** —— 各显示项含义、操作按钮的四种状态、状态栏各场景文案、读数约定（含界面截图） | 想了解某个显示项/文案的含义；改界面时 |
 | [ProjectStructure.md](ProjectStructure.md) | **项目结构** —— **项目概况**（目标机型 / 技术栈 / 交付形态 / 许可证）、完整目录树与各目录职责、**从源码构建**与打包机制（shade 合并 + 自动导出 `Dist/`）、**原生镜像构建**（GraalVM native image / CI）、产物名与版本管理说明 | 刚接手项目；不确定东西该放哪个目录 |
 | [LimitationsAndRoadmap.md](LimitationsAndRoadmap.md) | **已知限制与路线图** —— 四项能力边界的展开说明（如为何不支持单风扇定向控制）、后续待办 T1–T4 | 评估「某功能能不能做」；规划下一步 |

@@ -79,13 +79,14 @@
 ├── Script/                      提权启动器、诊断工具与产出归档
 │   ├── run-*-elevated.cmd              UAC 提权启动器（调用 Probe/Powershell 下的脚本）
 │   ├── ValidateScripts.ps1            脚本语法校验（范围见「开发约定」第 4 条）
+│   ├── CheckPomVersions.py            pom 第三方构件版本集中管理检查（见「开发约定」第 11 条）
 │   ├── GenerateNativeImageMetadata.py 生成 native-image 元数据（反射 / JNI / 资源，按产物存在性裁剪）
 │   ├── CompareScreenshots.py          对比两张截图判定文字抗锯齿类型（issue #20 的验收仪器）
 │   └── Evidence/                       探查与验证产出（归档）
 └── Docs/                        技术文档（本目录）
     ├── README.md                     文档索引（导读与建议阅读路径）
     ├── TechnicalPrinciples.md        技术原理（架构 / 性能 / WMI 接口 / 踩坑）
-    ├── DevelopmentConventions.md     开发约定（9 条硬性约定）
+    ├── DevelopmentConventions.md     开发约定（11 条硬性约定）
     ├── UserInterface.md              界面说明（显示项 / 按钮状态 / 读数约定）
     ├── ProjectStructure.md           项目结构（本文件）
     ├── LimitationsAndRoadmap.md      已知限制与路线图
