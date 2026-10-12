@@ -298,13 +298,18 @@ jobs:
             Write-Host $text
             throw '运行期冒烟失败：镜像缺字符集 —— pom 的 native-image profile 需要 -H:+AddAllCharsets（见 Docs/NativeImageCi.md 第 5 节第 13 条）'
           }
-          # 界面重构后新增：FXML 视图装不上时程序会打印「界面加载失败」，这是**运行期致命**，
-          # 只看字符集判定会漏过去（构建全绿、一运行就无窗口）。
-          if ($text -match '界面加载失败') {
+          # 界面重构（FXML）后的硬断言 —— 两个标记都用**纯 ASCII**：
+          # 冒烟以 GBK 运行（模拟中文 Windows），中文输出在日志里可能是乱码，ASCII 不受影响。
+          # 二者来自 FanControlApp（失败路径）与 FanControlController.initialize()（成功路径）。
+          if ($text -match '\[ui-fxml-load-failed\]') {
             Write-Host $text
             throw '运行期冒烟失败：FXML 视图未能加载（fxml/css 资源或控制器反射元数据缺失）—— 见 Docs/NativeImageCi.md 第 5 节第 20 条'
           }
-          Write-Host '冒烟通过：未出现字符集 / 类初始化失败 ✅'
+          if ($text -notmatch '\[ui-fxml-loaded\]') {
+            Write-Host $text
+            throw '运行期冒烟失败：输出里没有 [ui-fxml-loaded] 标记 —— FXML 视图没有真正加载完（资源 / 元数据漏登记，或程序在加载前就退出了）'
+          }
+          Write-Host '冒烟通过：[ui-fxml-loaded] 命中，且无字符集 / 类初始化 / 视图加载失败 ✅'
 
       # 自证④：exe 必须带 Windows 清单（dpiAware + supportedOS）。
       #

@@ -2499,6 +2499,20 @@
     "allDeclaredFields": true
   },
   {
+    "name": "javafx.fxml.FXML",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
+    "name": "javafx.fxml.FXMLLoader",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "javafx.print.Printer",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,

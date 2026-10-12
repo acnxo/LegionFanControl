@@ -736,7 +736,13 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     |---|---|---|
     | `javafx-fxml` 依赖 | `pom.xml`（与 controls / graphics / base 同规：win 分类器 + 排除空 meta jar） | 构建期 `NoClassDefFoundError: javafx/fxml/FXMLLoader` |
     | fxml / css 资源 | `resource-config.json` 里的 `io/github/acnxo/legion/fan/.*\\.fxml$` 与 `.*\\.css$` | 运行期 `getResource` 为 null ⇒ 「界面加载失败」 |
-    | 控制器 + FXML 用到的控件 / 布局类 | `reflect-config.json`（生成器里的 `FXML_UI_CLASSES` / `CONTROLLER_CLASS`） | FXMLLoader 按类名实例化 / 注入 `@FXML` 字段失败 ⇒ 「界面加载失败」 |
+    | 控制器 + FXML 用到的控件 / 布局类 + **FXMLLoader 自身** | `reflect-config.json`（生成器里的 `FXML_UI_CLASSES` / `CONTROLLER_CLASS`） | FXMLLoader 按类名实例化 / 注入 `@FXML` 字段失败 ⇒ 「界面加载失败」 |
+
+    > **实测踩到的那一个（2026-10-12，冒烟正面断言抓到）**：`FXMLLoader.<clinit>` 内部会
+    > `Utils.forceInit("javafx.fxml.FXMLLoader")` —— **按名字加载**，封闭世界分析看不到 ⇒ 类被裁掉，
+    > 原生包启动即 `AssertionError: ClassNotFoundException: javafx.fxml.FXMLLoader`（JVM 模式却正常）。
+    > 因此 `javafx.fxml.FXMLLoader`（及控制器用到的 `javafx.fxml.FXML` 注解）**必须**在登记表里 ——
+    > 登记即强制包含，光有「代码里直接引用」盖不住这条 forceInit 路径。
 
     为何控制器与控件都要登记：FXMLLoader 对控件是**按类名实例化**（`Class.forName` + 无参构造），
     对控制器是**反射注入 `@FXML` 字段、反射调用 `onAction` 方法** —— 都是封闭世界分析看不到的路径。
@@ -747,7 +753,7 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     |---|---|
     | 自证③（扩展） | `reflect-config.json` 必须含 `io.github.acnxo.legion.fan.FanControlController` |
     | `CheckExeFxmlView` | 在 **exe 字节**里找 `fx:controller="…FanControlController"` 与 CSS 的 `.fan-grid` ⇒ 证明 fxml / css 真的编进镜像 |
-    | 冒烟（扩展） | 运行 exe 后输出不得含「界面加载失败」（资源 / 元数据漏登记时构建不报，只有真跑才暴露） |
+    | 冒烟（扩展） | 运行 exe 后必须**命中** `[ui-fxml-loaded]`（FXML 已加载、控制器已注入），且不得出现 `[ui-fxml-load-failed]` —— 两个标记都是**纯 ASCII**，因此在 GBK 冒烟下的乱码日志里依旧可判 |
 
     规则：**FXML 里新增任何控件或布局类，都要同步加进生成器的 `FXML_UI_CLASSES`**，
     否则原生包会在启动时倒在这一步（JVM 模式不受影响，因为类路径上什么都有）。
