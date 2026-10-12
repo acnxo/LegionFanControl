@@ -322,6 +322,26 @@ jobs:
           }
           Write-Host '自证④通过：exe 内已含 Windows 清单（dpiAware / supportedOS）✅'
 
+      # 自证：exe 内必须**真的**嵌入了程序图标 —— “rc 编译成功”不等于“链接进了 exe”。
+      # 做法：在 exe 字节里找 exe.ico 载荷（PNG）开头 32 字节的签名；资源节按原样存放，命中即证明已嵌入。
+      # 用 Latin1 把字节映射成字符串再 IndexOf：比逐字节双重循环快几个数量级（exe 约 36 MB）。
+      - name: CheckExeIcon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'target/LegionFanControl.exe'
+          if (-not (Test-Path $exe)) { throw "未找到 $exe，无法检查程序图标" }
+          if (-not (Test-Path 'exe.ico')) { throw '未找到 exe.ico' }
+          $ico = [System.IO.File]::ReadAllBytes('exe.ico')
+          if ($ico.Length -lt 64) { throw 'exe.ico 过小，无法生成签名' }
+          $sig = $ico[22..53]
+          $sigStr = [System.Text.Encoding]::Latin1.GetString($sig)
+          $exeStr = [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($exe))
+          if ($exeStr.IndexOf($sigStr) -lt 0) {
+            throw 'exe 内未找到程序图标签名 —— 图标没有真正嵌进 exe（检查 pom 的 -H:NativeLinkerOption=${project.basedir}/exe.res 是否生效、exe.res 是否在链接前就已生成）'
+          }
+          Write-Host '自证通过：exe 内已嵌入程序图标（PNG 载荷签名命中）✅'
+
       # 自证⑤：exe 必须是 **GUI 子系统**。
       # 子系统决定了 Windows 要不要为进程创建控制台窗口：CONSOLE(3) 就是「双击/提权启动先弹黑框」的根因。
       # 这一项在 PE 头里可硬件级核实，不必等真机双击（详见 Docs/NativeImageCi.md 第 5 节第 18 条）。

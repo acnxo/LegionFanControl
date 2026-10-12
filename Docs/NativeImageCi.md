@@ -714,6 +714,7 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     | CI（`CompileAppIconResource`） | 编译资源 | `rc.exe /nologo /fo exe.res exe.rc` —— `rc.exe` 随 Windows SDK 提供，`InitMsvcToolchain`（ilammy/msvc-dev-cmd）注入 VS 环境后即在 PATH；失败即报错退出 |
     | pom（native-image profile） | 嵌入 exe | `-H:NativeLinkerOption=${project.basedir}/exe.res` —— `.res` 作为普通链接输入交给 MSVC 链接器 |
     | 运行期（`FanControlApp`） | 窗口 / 任务栏图标 | `stage.getIcons().add(new Image(getResourceAsStream("/io/github/acnxo/legion/fan/Logo.png")))`；`resource-config.json` 必须加 `io/github/acnxo/legion/fan/.*\\.png$`，否则原生镜像里取不到该资源 |
+    | CI 自证（`CheckExeIcon`） | 确认“真嵌进去了” | 在 exe 字节里找 `exe.ico` 载荷开头 32 字节的签名（资源节按原样存放，命中即证明已嵌入）—— “rc 编译成功”不等于“链接进了 exe” |
 
     为何 `rc` 这一步不做成“宽容”：pom 的链接参数是**无条件**引用的 —— `exe.res` 缺失会直接让链接失败；
     与其让下游报一句难懂的 link error，不如在 `CompileAppIconResource` 里给出可照做的提示。
