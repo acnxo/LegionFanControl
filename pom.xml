@@ -67,6 +67,31 @@
             <version>${javafx.version}</version>
             <classifier>win</classifier>
         </dependency>
+        <!--
+            界面重构后引入：FXML 装载器（界面结构 / 样式从 Java 代码中拆出去，见 FanControlView.fxml / .css）。
+            与上面三个模块同规：显式指定 win 分类器，并排除 POM 传递拉入的空 meta jar
+            （base / graphics / controls 已在本文件逐一显式声明）。
+        -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-base</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-graphics</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-controls</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 
     <build>

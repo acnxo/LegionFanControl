@@ -50,13 +50,20 @@
 │   ├── java/io/github/acnxo/legion/fan/
 │   │   ├── Launcher.java                入口（普通类，转发到 FanControlApp；顺带触发提权）
 │   │   ├── Elevation.java               管理员权限自提升（UAC 重启自身，失败不阻断启动）
-│   │   ├── FanControlApp.java           OpenJFX 界面与轮询调度
+│   │   ├── FanControlApp.java           组装层：加载 FXML 视图 + 装配控制器与业务层（不写布局 / 业务）
+│   │   ├── FanControlController.java    视图控制器：@FXML 控件注入、事件处理、显示格式化
+│   │   ├── FanControlService.java       业务逻辑：轮询 / 倒计时状态机 / 复位（不依赖 JavaFX）
+│   │   ├── ConsoleWindow.java           控制台窗口开关（--console / -Dlegion.console）
+│   │   ├── NativeImageRenderDefaults.java  原生镜像内的渲染默认值（issue #48 临时缓解，可关可退）
+│   │   ├── RenderDiagnostics.java       渲染诊断：只打日志，用于原生 / JVM 对照（issue #20）
 │   │   └── wmi/
 │   │       ├── WmiBridge.java                 接口契约 + Snapshot 记录
 │   │       ├── PowerShellWmiBridge.java       PowerShell 桥接实现（当前基线）
 │   │       ├── JnaComWmiBridge.java           JNA/COM 实现（桩，已后置）
 │   │       └── WmiException.java
 │   ├── resources/Asset/Logo.png         窗口 / 任务栏图标（JavaFX；原生镜像由 resource-config 收录）
+│   ├── resources/io/github/acnxo/legion/fan/FanControlView.fxml   界面结构（FXML；原生镜像需登记资源）
+│   ├── resources/io/github/acnxo/legion/fan/FanControlView.css    界面样式（CSS：间距 / 配色）
 │   └── resources/META-INF/native-image/ native-image 配置（反射 / JNI / 资源，类路径自动发现）
 ├── Probe/                       开发期探查与辅助工具（不参与打包）
 │   ├── README.md                    各探查脚本与工具逐一说明（含硬件影响标注）

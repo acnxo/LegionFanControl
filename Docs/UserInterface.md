@@ -4,6 +4,11 @@
 
 界面为**单列键值表 + 一个操作按钮**，底部一行状态栏。
 
+> **实现分层**：界面结构在 `src/main/resources/io/github/acnxo/legion/fan/FanControlView.fxml`，
+> 样式（间距 / 配色）在同目录 `FanControlView.css`，事件与显示格式化在 `FanControlController`，
+> 业务规则（轮询、倒计时、复位）在 `FanControlService`。改观感通常只需动 fxml / css。
+> **不要**在 FXML / CSS 里引入字体相关设置 —— 字体渲染是本项目的敏感项（见 [TS-2610-001](TroubleShooting/TS-2610-001-LCD-Subpixel-Text-Composition-Native-Image-Fix-And-Upstream-Tracking.md)）。
+
 ![界面截图](Asset/IMG/UI-Main.png)
 
 > 更换截图时只需覆盖 `Docs/Asset/IMG/UI-Main.png`，**无需改动任何 Markdown**。
