@@ -775,17 +775,34 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     `com/sun/javafx/reflect/Trampoline.class` 也当作**资源**编进了镜像 ⇒ `MethodUtil.findClass`
     能从 `getResourceAsStream` 读到这份字节 ⇒ 它才有机会去 `defineClass`。
 
-    **修复**（`pom.xml` 的 native-image profile，紧随 `-H:+AddAllCharsets`）：
+    **修复**（`resource-config.json`：给宽匹配配一条精确排除；JSON 自带的 `excludes` 不经命令行、
+    不受参数转义影响，比 `-H:ExcludeResources` 稳）：
 
-    ```xml
-    <arg>-H:ExcludeResources=com/sun/javafx/reflect/Trampoline\.class</arg>
+    ```json
+    {
+      "resources": {
+        "includes": [ "…（原有条目不动）" ],
+        "excludes": [ { "pattern": "com/sun/javafx/reflect/Trampoline\\.class" } ]
+      }
+    }
     ```
 
     为什么一条排除就够：资源被排除后，`MethodUtil.findClass` 抛 `ClassNotFoundException`，
     而它自己的 `loadClass` 会**吞掉这个异常并回落到父加载器** ⇒ 直接从镜像里取到该类
     （该类已由 `reflect-config.json` 登记，必然在镜像内）⇒ **完全不触发运行期定义类**。
-    这是 GraalVM 记录在案的开关（`-H:ExcludeResources`），不需要 open world，也不增加镜像体积。
+    不需要 open world，也不增加镜像体积。
 
+    | 本机实验（GraalVM 25，最小复现） | 结论 |
+    |---|---|
+    | 不做任何资源登记 | `.class` 与普通文件**都不可见** ⇒ `.class` 不会被自动当资源编进镜像 |
+    | 只做反射登记（不含资源规则） | `.class` **仍不可见** ⇒ 反射登记也不会顺带带上 `.class` 资源 |
+    | `resource-config.json` 登记 `R\.class` | 可见 ⇒ 资源登记生效（本问题的**唯一来源**） |
+    | `-H:ExcludeResources=R.class` | 可排除（命令行方式有效） |
+    | JSON 里的 `excludes` | 也可排除（**本修复采用的方式**） |
+
+    > 命令行 `-H:ExcludeResources=…Trampoline\.class` 在 CI 上实测**未生效**（同一份配置在本机
+    > 用命令行可排除、用 JSON 可排除，说明问题出在参数传递/转义链路上，而非机制本身）；
+    > 因此改用 JSON `excludes`。这类「宽匹配 + 精确排除」的登记请一律写在 JSON 里。
     | 试过并**已证伪**的两条路 | 失败证据 |
     |---|---|
     | `-H:+RuntimeClassLoading`（错误文案里 “by default” 指的就是它，隐含 open world） | 能过当层，但随后 `Fatal error: Unable to call AOT method: … ClassLoader.getPlatformClassLoader` + `InterpreterUtil.shouldNotReachHere` / `EXCEPTION_ACCESS_VIOLATION`；且镜像 102.2 → 156.9 MB、构建 4m56s → 6m28s |
@@ -795,6 +812,7 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     |---|---|
     | 自证③ | `reflect-config.json` 必须含 `com.sun.javafx.reflect.Trampoline`（含 `invoke` 方法条目）—— 它是「回落父加载器能否成功」的前提，删了就退回崩溃 |
     | 冒烟 | 必须命中 `[ui-fxml-loaded]`：命中即证明整条 FXML 链路（登记 → 资源 → 反射 → trampoline 回落）在原生镜像里打通 |
+    | 诊断标记 | 启动时打印 `[diag-trampoline-resource]`：**应为 `null`**；若是 `visible`，说明排除又失效了，会上演同一场崩溃 |
 
     > **教训**：`com/sun/javafx/.*` 这类**宽匹配资源登记**会把 `.class` 也编进去，从而改变框架
     > 自身的类加载路径 —— 宽匹配必须配一条精确排除，否则会引出「构建全绿、运行即崩」的问题。

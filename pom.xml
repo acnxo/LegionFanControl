@@ -267,17 +267,6 @@
                                      连带 NativeLibLoader 的第①条路径中断、原生库永远加载不到 ——
                                      最终表现为「两条 Prism 管线都起不来」（详见第 5 节第 13 条）。 -->
                                 <arg>-H:+AddAllCharsets</arg>
-                                <!-- 关键修复（2026-10-12）：resource-config.json 里的 com/sun/javafx/.* 会把
-                                     com/sun/javafx/reflect/Trampoline.class 也当作**资源**编进镜像；而 JavaFX 的 MethodUtil
-                                     （一个私有 SecureClassLoader）正是靠 getResourceAsStream 读到这份字节，进而在**运行期**
-                                     defineClass —— native-image 禁止运行期定义类，于是原生包启动即崩：
-                                       UnsupportedFeatureError: Classes cannot be defined at runtime …
-                                       Tried to define class com.sun.javafx.reflect.Trampoline
-                                     排除这一个资源后，MethodUtil.findClass 会抛 ClassNotFoundException（它的 loadClass 会吞掉
-                                     该异常并回落到父加载器）⇒ 直接从镜像里取到该类（它已由 reflect-config.json 登记）。
-                                     这是让框架走它自己的正常回落路径，不是绕过：无需开 open world，也不增加镜像体积。
-                                     同一类问题的另一条路（-H:+RuntimeClassLoading / 预定义类）已证伪，见 Docs/NativeImageCi.md 第 5 节第 21 条。 -->
-                                <arg>-H:ExcludeResources=com/sun/javafx/reflect/Trampoline\.class</arg>
 
                                 <!-- Windows exe 清单：没有它，进程被判为「DPI 不感知」
                                      （整窗位图放大 → 字体发虚），且 Windows 会谎报系统版本
