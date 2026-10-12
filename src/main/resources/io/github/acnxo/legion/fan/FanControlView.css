@@ -1,0 +1,19 @@
+/*
+ * 展示层样式：版式（间距 / 内边距）与配色都在这里，Java 代码里不再出现任何间距、颜色字面量。
+ *
+ * 注意：这里刻意**不设置字体族 / 字号** —— 字体渲染是本项目的敏感项（issue #20 的 LCD
+ * 次像素退化只在原生镜像下出现），任何字体相关改动都必须先按 Docs/TroubleShooting/
+ * TS-2610-001 的口径取证，不能作为“顺手改样式”的一部分。
+ */
+
+/* 键值表容器：与原实现 grid.setPadding(new Insets(20)) / setHgap(20) / setVgap(15) 等价 */
+.fan-grid {
+    -fx-padding: 20;
+    -fx-hgap: 20;
+    -fx-vgap: 15;
+}
+
+/* 状态栏的错误态（未提权 / 读取异常等）：原先由 statusValue.setStyle("-fx-text-fill: #b00020") 施加 */
+.status-error {
+    -fx-text-fill: #b00020;
+}

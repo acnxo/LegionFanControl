@@ -11,7 +11,9 @@
       { "pattern": ".*\\.dll$" },
       { "pattern": "com/sun/glass/utils/NativeLibLoader\\.class" },
       { "pattern": "sun/text/resources/LineBreakIteratorData" },
-      { "pattern": ".*\\.icu$" }
+      { "pattern": ".*\\.icu$" },
+      { "pattern": "io/github/acnxo/legion/fan/.*\\.fxml$" },
+      { "pattern": "io/github/acnxo/legion/fan/.*\\.css$" }
     ]
   }
 }

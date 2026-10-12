@@ -125,6 +125,23 @@ PROBE_REFLECT_CLASSES = [
     "com.sun.prism.impl.PrismSettings",
 ]
 
+# ---------------------------------------------------------------------------
+# FXML 界面（2026-10-12 重构起）：界面结构迁到 FanControlView.fxml，FXMLLoader 在**运行期**
+# 按类名实例化这些控件 / 布局，并按名字注入控制器的 @FXML 字段与事件方法 ——
+# 与「按名字加载的 JavaFX 类」同理，封闭世界分析看不到它们，缺了就启动即「界面加载失败」。
+# 规则：FXML 里新增任何控件 / 布局类，都必须加到这里（详见 Docs/NativeImageCi.md 第 5 节第 20 条）。
+# ---------------------------------------------------------------------------
+FXML_UI_CLASSES = (
+    "javafx.scene.control.Label",
+    "javafx.scene.control.Button",
+    "javafx.scene.layout.GridPane",
+    "javafx.scene.layout.HBox",
+    "javafx.scene.layout.ColumnConstraints",
+)
+
+# fx:controller 指定的控制器：FXML 反射注入 @FXML 字段、反射调用 onAction 方法
+CONTROLLER_CLASS = "io.github.acnxo.legion.fan.FanControlController"
+
 JDK_PREFIXES = ("java.", "javax.", "sun.", "jdk.", "com.sun.management.")
 
 # ---------------------------------------------------------------------------
@@ -450,6 +467,17 @@ def main() -> int:
             )
             added_named += 1
     print(f"JavaFX 按名字加载：候选 {len(named)} 个，新增登记 {added_named} 个")
+
+    # FXML 界面：控制器（反射注入字段 / 调用事件方法）与 FXML 里用到的控件、布局类
+    added_fxml = 0
+    for name in (CONTROLLER_CLASS, *FXML_UI_CLASSES):
+        if exists(name) and name not in {e["name"] for e in reflect}:
+            if name == CONTROLLER_CLASS:
+                reflect.append(all_declared(name))     # 控制器需要 allDeclaredFields（@FXML 注入）
+            else:
+                reflect.append(all_declared(name))
+            added_fxml += 1
+    print(f"FXML 界面：候选 {1 + len(FXML_UI_CLASSES)} 个，新增登记 {added_fxml} 个")
 
     for name in (APP_CLASS, *FONT_CLASSES, *WIN_GLASS_CLASSES):
         if exists(name):

@@ -2426,6 +2426,13 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "io.github.acnxo.legion.fan.FanControlController",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "javafx.animation.Interpolator"
   },
   {
@@ -2564,7 +2571,21 @@
     "allDeclaredFields": true
   },
   {
+    "name": "javafx.scene.control.Button",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "javafx.scene.control.Control"
+  },
+  {
+    "name": "javafx.scene.control.Label",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.control.Labeled"
@@ -2601,6 +2622,27 @@
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
+  },
+  {
+    "name": "javafx.scene.layout.ColumnConstraints",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
+    "name": "javafx.scene.layout.GridPane",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
+    "name": "javafx.scene.layout.HBox",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.layout.Pane"
