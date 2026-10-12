@@ -2513,6 +2513,13 @@
     "allDeclaredClasses": true
   },
   {
+    "name": "javafx.geometry.Pos",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "javafx.print.Printer",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
@@ -2543,13 +2550,21 @@
     "allDeclaredFields": true
   },
   {
-    "name": "javafx.scene.Node"
+    "name": "javafx.scene.Node",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.ParallelCamera"
   },
   {
-    "name": "javafx.scene.Parent"
+    "name": "javafx.scene.Parent",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.PerspectiveCamera",
@@ -2592,7 +2607,11 @@
     "allDeclaredClasses": true
   },
   {
-    "name": "javafx.scene.control.Control"
+    "name": "javafx.scene.control.Control",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.control.Label",
@@ -2602,7 +2621,11 @@
     "allDeclaredClasses": true
   },
   {
-    "name": "javafx.scene.control.Labeled"
+    "name": "javafx.scene.control.Labeled",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.control.TableColumnBase",
@@ -2662,7 +2685,18 @@
     "name": "javafx.scene.layout.Pane"
   },
   {
-    "name": "javafx.scene.layout.Region"
+    "name": "javafx.scene.layout.Priority",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
+    "name": "javafx.scene.layout.Region",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
   },
   {
     "name": "javafx.scene.paint.Color",

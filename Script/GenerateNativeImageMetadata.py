@@ -143,6 +143,18 @@ FXML_UI_CLASSES = (
     "javafx.scene.layout.GridPane",
     "javafx.scene.layout.HBox",
     "javafx.scene.layout.ColumnConstraints",
+    # FXML 反射调用的成员分散在**祖先类**上：getId/setId/getStyleClass 在 Node，
+    # setMaxWidth/setPrefWidth 在 Region，setWrapText/setText 在 Labeled ——
+    # allDeclaredMethods 只覆盖本类声明的成员，父类必须单独登记（并且自身也要 allDeclared*）。
+    # 2026-10-12 实测：只登记控件类，原生包报 MissingReflectionRegistrationError: Node.getId()。
+    "javafx.scene.Node",
+    "javafx.scene.Parent",
+    "javafx.scene.layout.Region",
+    "javafx.scene.control.Control",
+    "javafx.scene.control.Labeled",
+    # FXML 属性里的枚举：alignment="CENTER" → Pos.valueOf，hgrow="ALWAYS" → Priority.valueOf
+    "javafx.geometry.Pos",
+    "javafx.scene.layout.Priority",
 )
 
 # fx:controller 指定的控制器：FXML 反射注入 @FXML 字段、反射调用 onAction 方法
