@@ -6,7 +6,7 @@
 
     <groupId>io.github.acnxo</groupId>
     <artifactId>legion-fan-control</artifactId>
-    <version>0.3.0</version>
+    <version>0.3.1</version>
     <packaging>jar</packaging>
     <name>legion-fan-control</name>
     <description>联想拯救者笔记本风扇控制工具</description>

@@ -133,7 +133,7 @@ public class FanControlApp extends Application {
         root.setAlignment(Pos.CENTER);
         // 宽度 470：容纳「风扇 1 转速（左 / CPU 侧，推测）」这类较长标注而不被截断
         stage.setScene(new Scene(root, 600, 360));
-        stage.setTitle("Legion风扇控制 V0.3.0");
+        stage.setTitle("Legion风扇控制 V0.3.1");
         stage.setOnCloseRequest(e -> shutdown());
         stage.show();
         // 注：应用内「屏幕字形像素」（Robot 抓屏）已停用 —— 两次真机验证都证明它抓到的**不是本窗口**
