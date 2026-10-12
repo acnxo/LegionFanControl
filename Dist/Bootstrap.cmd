@@ -38,6 +38,13 @@ rem 如需指定特定 JDK，取消下一行注释并填入 java.exe 的完整�
 rem set "JAVA_EXE=D:\Dev\Java\JDK\25\bin\java.exe"
 if not defined JAVA_EXE set "JAVA_EXE=java"
 
+rem 静默启动用 javaw.exe（GUI 子系统、无控制台）：与 java.exe 同目录；
+rem JAVA_EXE 是裸 "java"（走 PATH）时，直接用 PATH 里的 javaw。
+set "JAVAW_EXE=javaw"
+if /i not "%JAVA_EXE%"=="java" (
+    for %%I in ("%JAVA_EXE%") do set "JAVAW_EXE=%%~dpIjavaw.exe"
+)
+
 rem 系统工具一律用绝对路径调用，避免被 PATH 中的同名程序遮蔽
 set "PS_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 rem ---------------------------------------------------------------------------
@@ -96,17 +103,15 @@ if errorlevel 1 (
     exit /b 0
 )
 
-rem ---------- 第 4 步：启动程序 ----------
+rem ---------- 第 4 步：启动程序（启动成功即退出，不留窗口）----------
+rem 用 javaw 后台启动：GUI 子系统、没有控制台，所以脚本结束后不会留下任何窗口，
+rem 也不再需要「按任意键继续」。
+rem 注意：这样一来程序日志不再打在窗口里 —— 需要看 渲染诊断：… 时，
+rem       请在已提权的终端里手动执行：
+rem         java --enable-native-access=ALL-UNNAMED -jar LegionFanControl.jar
+rem 出错提示由前面的检查负责（jar 缺失 / java 不可用 / 提权失败都会停在窗口里）。
 rem %%* 用于透传额外命令行参数（一般用不到，保留以便扩展）
 echo 正在启动 Legion 风扇控制工具...
-"%JAVA_EXE%" %JAVA_OPTS% -jar "%JAR_PATH%" %*
-
-rem 程序窗口关闭后回到这里。退出码非 0 时暂停，便于查看错误信息；
-rem 正常关闭时退出码为 0，不打扰用户。
-if errorlevel 1 (
-    echo.
-    echo [提示] 程序已退出，退出码 %errorlevel%。
-    pause
-)
+start "" "%JAVAW_EXE%" %JAVA_OPTS% -jar "%JAR_PATH%" %*
 
 endlocal
