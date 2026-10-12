@@ -1,0 +1,6 @@
+Manufacturer=LENOVO
+Model=82RF
+Family=Legion Y9000P IAH7H
+BIOS=J2CN57WW
+--- LENOVO WMI classes ---
+ERROR: A parameter cannot be found that matches parameter name 'List'.

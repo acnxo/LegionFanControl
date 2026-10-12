@@ -1,0 +1,184 @@
+﻿Time=2026-09-27 21:02:00
+User=<已隐去>
+IsAdmin=True
+
+=== methods: LENOVO_GAMEZONE_DATA ===
+GetIRTemp
+GetThermalTableID
+SetThermalTableID
+IsSupportGpuOC
+GetGpuGpsState
+SetGpuGpsState
+GetFanCount
+GetFan1Speed
+GetFan2Speed
+GetFanMaxSpeed
+GetVersion
+IsSupportFanCooling
+SetFanCooling
+IsSupportCpuOC
+IsBIOSSupportOC
+SetBIOSOC
+GetTriggerTemperatureValue
+GetCPUTemp
+GetGPUTemp
+GetFanCoolingStatus
+IsSupportDisableWinKey
+SetWinKeyStatus
+GetWinKeyStatus
+IsSupportDisableTP
+SetTPStatus
+GetTPStatus
+GetGPUPow
+GetGPUOCPow
+GetGPUOCType
+GetKeyboardfeaturelist
+GetMemoryOCInfo
+IsSupportWaterCooling
+SetWaterCoolingStatus
+GetWaterCoolingStatus
+IsSupportLightingFeature
+SetKeyboardLight
+GetKeyboardLight
+GetMacrokeyScancode
+GetMacrokeyCount
+IsSupportGSync
+GetGSyncStatus
+SetGSyncStatus
+IsSupportSmartFan
+SetSmartFanMode
+GetSmartFanMode
+GetSmartFanSetting
+GetPowerChargeMode
+GetProductInfo
+IsSupportOD
+GetODStatus
+SetODStatus
+SetLightControlOwner
+SetDDSControlOwner
+IsRestoreOCValue
+GetThermalMode
+GetBIOSOCMode
+SetIntelligentSubMode
+GetIntelligentSubMode
+GetHardwareInfoSupportVersion
+GetCpuFrequency
+GetLearningProfileCount
+IsACFitForOC
+IsSupportIGPUMode
+GetIGPUModeStatus
+SetIGPUModeStatus
+NotifyDGPUStatus
+IsChangedYLog
+GetDGPUHWId
+
+=== methods: LENOVO_FAN_METHOD ===
+Fan_Get_FullSpeed
+Fan_Set_FullSpeed
+Fan_Get_MaxSpeed
+Fan_Set_MaxSpeed
+Fan_Get_Table
+Fan_Set_Table
+Fan_GetCurrentFanSpeed
+Fan_GetCurrentSensorTemperature
+Fan_SetCurrentFanSpeed
+
+=== methods: LENOVO_OTHER_METHOD ===
+GetDeviceType
+GetSupportThermalMode
+GetCustomModeAbility
+Set_Custom_Mode_Status
+Get_Legion_Device_Support_Feature
+Get_Device_Current_Support_Feature
+Set_Device_Current_Support_Feature
+Get_Support_LegionZone_Version
+Set_DGPU_Device_Status
+Get_DGPU_Device_DIDVID
+Get_AC_PD_Status
+Set_DGPU_Whisper_Mode
+
+=== methods: LENOVO_CPU_METHOD ===
+CPU_Get_OC_Status
+CPU_Set_OC_Status
+CPU_Get_ShortTerm_PowerLimit
+CPU_Set_ShortTerm_PowerLimit
+CPU_Get_LongTerm_PowerLimit
+CPU_Set_LongTerm_PowerLimit
+CPU_Get_Default_PowerLimit
+CPU_Get_Peak_PowerLimit
+CPU_Set_Peak_PowerLimit
+CPU_Get_Temperature_Control
+CPU_Set_Temperature_Control
+Get_APU_sPPT_PowerLimit
+Set_APU_sPPT_PowerLimit
+CPU_Set_OC_Data
+CPU_Get_Support_OC_Status
+CPU_Get_Cross_Loading_PowerLimit
+CPU_Set_Cross_Loading_PowerLimit
+
+=== methods: LENOVO_GPU_METHOD ===
+GPU_Get_OC_Status
+GPU_Set_OC_Status
+GPU_Get_PPAB_PowerLimit
+GPU_Set_PPAB_PowerLimit
+GPU_Get_cTGP_PowerLimit
+GPU_Set_cTGP_PowerLimit
+GPU_Get_Default_PPAB_cTGP_PowerLimit
+GPU_Get_Temperature_Limit
+GPU_Set_Temperature_Limit
+GPU_Get_Boost_Clock
+
+=== instances: LENOVO_FAN_TABLE_DATA ===
+Active=True; CurrentFanMaxSpeed=4800; CurrentFanMinSpeed=1700; DesignMaxFanSpeedNumber=9; EndOnlyUpwardAdjustNumber=10; Fan_Id=0; FanSpeedStep=0; FanTable_Data=1700,1800,2000,2200,2800,3400,3700,4100,4400,4800; FanTable_Len=10; InstanceName=ACPI\PNP0C14\GMZN_0; MaxSensorTemperature=92; MinSensorTemperature=58; Reserved=0; Sensor_ID=3; SensorTable_Data=58,58,58,58,66,74,79,81,84,92; SensorTable_Len=10; SensorTemperatureStep=0; StartOnlyUpwardAdjustNumber=0
+Active=True; CurrentFanMaxSpeed=4800; CurrentFanMinSpeed=1700; DesignMaxFanSpeedNumber=9; EndOnlyUpwardAdjustNumber=10; Fan_Id=0; FanSpeedStep=0; FanTable_Data=1700,1800,2000,2200,2800,3400,3700,4100,4400,4800; FanTable_Len=10; InstanceName=ACPI\PNP0C14\GMZN_1; MaxSensorTemperature=127; MinSensorTemperature=37; Reserved=0; Sensor_ID=0; SensorTable_Data=37,41,46,127,127,127,127,127,127,127; SensorTable_Len=10; SensorTemperatureStep=0; StartOnlyUpwardAdjustNumber=0
+Active=True; CurrentFanMaxSpeed=4800; CurrentFanMinSpeed=1600; DesignMaxFanSpeedNumber=9; EndOnlyUpwardAdjustNumber=10; Fan_Id=1; FanSpeedStep=0; FanTable_Data=1600,1800,2100,2300,2900,3500,3700,4100,4500,4800; FanTable_Len=10; InstanceName=ACPI\PNP0C14\GMZN_2; MaxSensorTemperature=88; MinSensorTemperature=65; Reserved=0; Sensor_ID=4; SensorTable_Data=65,65,65,65,65,74,78,78,81,88; SensorTable_Len=10; SensorTemperatureStep=0; StartOnlyUpwardAdjustNumber=0
+
+=== instances: LENOVO_FAN_MAX_SPEED_DATA ===
+ERR: Not supported 
+
+=== instances: LENOVO_DEFAULT_VALUE_IN_DIFFERENT_MODE_DATA ===
+Active=True; Default_cTGP_Powerlimit=0; Default_PPAB_Powerlimit=0; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=25; DefaultLongTermPowerlimit=25; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=45; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=0; FanTable=1700,1800,2000,2200,2800,3400,3700,4100,4400,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_0; mode=1; Reserved=0; SensorID=3
+Active=True; Default_cTGP_Powerlimit=0; Default_PPAB_Powerlimit=0; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=25; DefaultLongTermPowerlimit=25; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=45; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=0; FanTable=1700,1800,2000,2200,2800,3400,3700,4100,4400,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_1; mode=1; Reserved=0; SensorID=0
+Active=True; Default_cTGP_Powerlimit=0; Default_PPAB_Powerlimit=0; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=25; DefaultLongTermPowerlimit=25; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=45; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=1; FanTable=1600,1800,2100,2300,2900,3500,3700,4100,4500,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_2; mode=1; Reserved=0; SensorID=4
+Active=True; Default_cTGP_Powerlimit=0; Default_PPAB_Powerlimit=5; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=45; DefaultLongTermPowerlimit=60; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=80; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=0; FanTable=1700,1800,2000,2200,2800,3400,3700,4100,4400,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_3; mode=2; Reserved=0; SensorID=3
+Active=True; Default_cTGP_Powerlimit=0; Default_PPAB_Powerlimit=5; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=45; DefaultLongTermPowerlimit=60; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=80; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=0; FanTable=1700,1800,2000,2200,2800,3400,3700,4100,4400,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_4; mode=2; Reserved=0; SensorID=0
+Active=True; Default_cTGP_Powerlimit=0; Default_PPAB_Powerlimit=5; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=45; DefaultLongTermPowerlimit=60; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=80; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=1; FanTable=1600,1800,2100,2300,2900,3500,3700,4100,4500,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_5; mode=2; Reserved=0; SensorID=4
+Active=True; Default_cTGP_Powerlimit=10; Default_PPAB_Powerlimit=25; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=45; DefaultLongTermPowerlimit=105; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=135; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=0; FanTable=1700,1800,2000,2200,2800,3400,3700,4100,4400,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_6; mode=3; Reserved=0; SensorID=3
+Active=True; Default_cTGP_Powerlimit=10; Default_PPAB_Powerlimit=25; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=45; DefaultLongTermPowerlimit=105; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=135; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=0; FanTable=1700,1800,2000,2200,2800,3400,3700,4100,4400,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_7; mode=3; Reserved=0; SensorID=0
+Active=True; Default_cTGP_Powerlimit=10; Default_PPAB_Powerlimit=25; DefaultAPUsPPTPowerLimit=0; DefaultCpuCrossLoading=45; DefaultLongTermPowerlimit=105; DefaultPeakPowerLimit=0; DefaultShortTermPowerlimit=135; DefaultTemperatueControl=97; DefaultTemperatueLimit=87; DesignMaxFanSpeedNumber=9; FanID=1; FanTable=1600,1800,2100,2300,2900,3500,3700,4100,4500,4800; FanTableSize=10; InstanceName=ACPI\PNP0C14\GMZN_8; mode=3; Reserved=0; SensorID=4
+
+=== instances: LENOVO_UTILITY_DATA ===
+Active=True; InstanceName=ACPI\PNP0C14\LSK20_0
+
+GAMEZONE instance=ACPI\PNP0C14\GMZN_0
+FAN_METHOD instance=ACPI\PNP0C14\GMZN_0
+
+IsSupportFanCooling: Data=0 ReturnValue=
+GetSmartFanMode: Data=1 (1=quiet 2=balance 3=perf 255=custom)
+GetCPUTemp: Data=0
+GetGPUTemp: Data=0
+
+=== baseline (3 samples, 2s apart) ===
+t=0s fan1=0 fan2=0
+t=2s fan1=0 fan2=0
+t=4s fan1=0 fan2=0
+
+=== SetFanCooling(1) ===
+SetFanCooling(1) ReturnValue=
+t=2s fan1=0 fan2=0
+t=4s fan1=0 fan2=0
+t=6s fan1=0 fan2=0
+t=8s fan1=0 fan2=0
+t=10s fan1=0 fan2=0
+t=12s fan1=0 fan2=0
+t=14s fan1=0 fan2=0
+t=16s fan1=0 fan2=0
+t=18s fan1=0 fan2=0
+t=20s fan1=0 fan2=0
+t=22s fan1=0 fan2=0
+t=24s fan1=0 fan2=0
+t=26s fan1=0 fan2=0
+
+=== SetFanCooling(0) ===
+SetFanCooling(0) ReturnValue=
+post fan1=0 fan2=0
