@@ -1,0 +1,13 @@
+# 行尾约定（机器强制）
+#
+# 背景：Windows 批处理（.cmd）含中文时，若以 LF 行尾保存，cmd.exe 按系统代码页**逐字节**
+# 读取会把行读错位，后续行被当成命令执行（控制台喷 'xxx' is not recognized ... 碎片报错）。
+# 根因是 LF，与编码无关（LF+UTF-8 与 LF+GBK 均失败，CRLF+UTF-8 与 CRLF+GBK 均正常）。
+#
+# 写 eol=crlf 而不是只靠 core.autocrlf：前者对**所有平台、所有本地 git 配置**都生效，
+# 保证任何人签出（以及 CI 打包进发布 zip）拿到的都是 CRLF。
+*.cmd text eol=crlf
+*.bat text eol=crlf
+#
+# .ps1 统一 LF（PowerShell 两者都能解析，统一后 diff 更干净）。
+*.ps1 text eol=lf
