@@ -319,6 +319,15 @@
                                 <!-- 归因审计：打印「哪些类被在构建期初始化」。
                                      只影响构建日志，不改产物行为。
                                      日志由工作流保留，可直接判定是否存在构建期固化。 -->
+                                <!-- 试验性开关（2026-10-12）：FXML 装载时 JavaFX 会在**运行期**动态生成
+                                     com.sun.javafx.reflect.Trampoline（绕模块访问限制），而 native-image
+                                     默认禁止运行期定义类，报 UnsupportedFeatureError: Classes cannot be
+                                     defined at runtime by default … Tried to define class。
+                                     代价：该开关 implied open world，镜像可能变大、构建变慢。
+                                     若体积/耗时不可接受，改用定点方案：用 tracing agent 的
+                                     experimental-class-define-support 收集 Trampoline，再用
+                                     -H:PredefinedClassesConfigurationFiles 预定义（见 Docs/NativeImageCi.md 第 5 节第 21 条）。 -->
+                                <arg>-H:+RuntimeClassLoading</arg>
                                 <arg>-H:+UnlockExperimentalVMOptions</arg>
                                 <arg>-H:+PrintClassInitialization</arg>
                             </buildArgs>
