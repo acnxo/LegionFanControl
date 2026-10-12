@@ -60,8 +60,12 @@ public final class FanControlController implements FanControlService.Listener {
         // 这里只补最小宽度 —— 取当前布局实际分配给状态栏的宽度 × 1.2。
         double statusWidthBefore = Math.max(grid.prefWidth(-1) - GRID_HORIZONTAL_PADDING, 0);
         statusValue.setMinWidth(Math.round(statusWidthBefore * STATUS_MIN_WIDTH_FACTOR));
-        System.out.println("窗口布局：状态栏最小宽度 = " + Math.round(statusWidthBefore * STATUS_MIN_WIDTH_FACTOR)
+        // 前面的 [ui-fxml-loaded] 是给 CI 冒烟用的**纯 ASCII 标记**（冒烟以 GBK 跑，中文可能是乱码），
+        // 它等价于「FXML 已加载、控制器已注入」—— 详见 Docs/NativeImageCi.md 第 5 节第 20 条。
+        System.out.println("[ui-fxml-loaded] 窗口布局：状态栏最小宽度 = "
+                + Math.round(statusWidthBefore * STATUS_MIN_WIDTH_FACTOR)
                 + " px（原 " + Math.round(statusWidthBefore) + " px 的 1.2 倍），宽度上限随窗口自适应");
+        System.out.flush(); // 显式 flush：重定向到文件时 System.out 不自动 flush，避免标记丢失
     }
 
     /** FXML 的 onAction 绑定点：只委托给业务层。 */

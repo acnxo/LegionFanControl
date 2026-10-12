@@ -63,9 +63,12 @@ public class FanControlApp extends Application {
             controller = loader.getController();
         } catch (IOException | RuntimeException e) {
             // 视图装不上就没有界面可给：把原因写清楚再退出。
-            // 原生镜像下这类失败通常是资源（fxml/css）或反射元数据（控制器）没登记，见 Docs/NativeImageCi.md。
-            System.err.println("界面加载失败（" + VIEW_FXML + "）：" + e);
+            // [ui-fxml-load-failed] 是给 CI 冒烟用的**纯 ASCII 标记**（冒烟以 GBK 跑，中文在日志里可能是乱码，
+            // 而 ASCII 不受影响）；对应的成功标记 [ui-fxml-loaded] 在 FanControlController.initialize()。
+            // 原生镜像下这类失败通常是资源（fxml/css）或反射元数据（控制器）没登记，见 Docs/NativeImageCi.md 第 5 节第 20 条。
+            System.err.println("[ui-fxml-load-failed] 界面加载失败（" + VIEW_FXML + "）：" + e);
             e.printStackTrace();
+            System.err.flush();
             Platform.exit();
             return;
         }

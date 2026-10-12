@@ -747,7 +747,7 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     |---|---|
     | 自证③（扩展） | `reflect-config.json` 必须含 `io.github.acnxo.legion.fan.FanControlController` |
     | `CheckExeFxmlView` | 在 **exe 字节**里找 `fx:controller="…FanControlController"` 与 CSS 的 `.fan-grid` ⇒ 证明 fxml / css 真的编进镜像 |
-    | 冒烟（扩展） | 运行 exe 后输出不得含「界面加载失败」（资源 / 元数据漏登记时构建不报，只有真跑才暴露） |
+    | 冒烟（扩展） | 运行 exe 后必须**命中** `[ui-fxml-loaded]`（FXML 已加载、控制器已注入），且不得出现 `[ui-fxml-load-failed]` —— 两个标记都是**纯 ASCII**，因此在 GBK 冒烟下的乱码日志里依旧可判 |
 
     规则：**FXML 里新增任何控件或布局类，都要同步加进生成器的 `FXML_UI_CLASSES`**，
     否则原生包会在启动时倒在这一步（JVM 模式不受影响，因为类路径上什么都有）。
