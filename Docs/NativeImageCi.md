@@ -773,7 +773,7 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     |---|---|
     | 采集 | `.github/workflows/CollectPredefinedClasses.yml`（手动 / push 限定文件触发）：只构建 fat jar，用 `Script/FxmlLoadProbe.java` 装载一次 FXML 后**优雅退出** |
     | 三个必备条件 | ① 用 `-agentpath:` 显式指 agent 动态库（`-agentlib:` 在 Windows 上找不到库）；② 加 `--add-opens java.base/java.lang=ALL-UNNAMED` —— JVM 上 JavaFX 的 `defineClass` 会被模块访问挡住，**不加就采不到**；③ 必须优雅退出（agent 在关闭钩子里落盘，强杀进程会丢结果） |
-    | 入库 | `predefined-classes-config.json` + `<hash>.classdata` 放进 `src/main/resources/META-INF/native-image/`（两者是同一次采集的一对，native-image 按文件名自动识别） |
+    | 入库 | `predefined-classes-config.json` 放进 `src/main/resources/META-INF/native-image/`，`<hash>.classdata` 放进其下的 `agent-extracted-predefined-classes/` 子目录（**层级不能压平**；native-image 按文件名自动识别清单，类数据则按此固定相对路径查找） |
     | 规则 | 这两个文件是**采集产物**，不得手改；要更新就重跑采集作业，把新产物整体替换 |
 
     > **只取定点所需的两个文件**：agent 同一次运行还产出了 120 KB 的 `reachability-metadata.json`，
