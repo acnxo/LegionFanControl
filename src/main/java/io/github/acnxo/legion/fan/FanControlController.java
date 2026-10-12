@@ -28,22 +28,28 @@ public final class FanControlController implements FanControlService.Listener {
     /** FanControlView.css 中 .fan-grid 的 -fx-padding: 20 ⇒ 左右各 20px */
     private static final double GRID_HORIZONTAL_PADDING = 40;
 
+    // 注意：FXML 注入的字段与事件方法都声明为 **public**，这是原生镜像的硬要求 ——
+    // JavaFX 反射访问**非 public** 成员时会在运行期动态生成 com.sun.javafx.reflect.Trampoline
+    // 来绕过模块访问限制，而 native-image 不允许运行期定义类，会抛：
+    //   UnsupportedFeatureError: Classes cannot be defined at runtime … Tried to define class:
+    //   com.sun.javafx.reflect.Trampoline
+    // 成员为 public 时 JavaFX 走普通反射（已由 reflect-config.xml 登记），不再需要 Trampoline。
     @FXML
-    private GridPane grid;
+    public GridPane grid;
     @FXML
-    private Label fan1Value;
+    public Label fan1Value;
     @FXML
-    private Label fan2Value;
+    public Label fan2Value;
     @FXML
-    private Label cpuTempValue;
+    public Label cpuTempValue;
     @FXML
-    private Label gpuTempValue;
+    public Label gpuTempValue;
     @FXML
-    private Label modeValue;
+    public Label modeValue;
     @FXML
-    private Label statusValue;
+    public Label statusValue;
     @FXML
-    private Button toggleButton;
+    public Button toggleButton;
 
     private FanControlService service;
     private boolean cooling;
@@ -55,7 +61,7 @@ public final class FanControlController implements FanControlService.Listener {
 
     /** FXMLLoader 在装载后自动调用：只做「视图自身的度量与初始化」。 */
     @FXML
-    private void initialize() {
+    public void initialize() {
         // 状态栏宽度：上限随窗口自适应（FXML 里 maxWidth="Infinity" + 第 2 列 hgrow=ALWAYS），
         // 这里只补最小宽度 —— 取当前布局实际分配给状态栏的宽度 × 1.2。
         double statusWidthBefore = Math.max(grid.prefWidth(-1) - GRID_HORIZONTAL_PADDING, 0);
@@ -70,7 +76,7 @@ public final class FanControlController implements FanControlService.Listener {
 
     /** FXML 的 onAction 绑定点：只委托给业务层。 */
     @FXML
-    private void onToggle() {
+    public void onToggle() {
         service.toggle();
     }
 
