@@ -69,6 +69,26 @@ jobs:
           if ($cl) { Write-Host "MSVC cl.exe = $($cl.Source)" }
           else { Write-Host 'WARNING: cl.exe 不在 PATH，native-image 链接可能失败' }
 
+      # 程序图标：把 exe.rc + exe.ico 编译成 exe.res（native-image 链接阶段会把它并进 exe）。
+      # 为何必须放在 BuildNativeImage 之前且必须成功：pom 的 native-image profile 无条件引用
+      # ${project.basedir}/exe.res，缺了它链接会直接失败 —— 所以这里失败要给出可照做的提示。
+      # rc.exe 随 Windows SDK 提供，InitMsvcToolchain（ilammy/msvc-dev-cmd）注入 VS 环境后即在 PATH。
+      # 注意：exe.res 写在仓库根（不在 target/ 下）—— BuildNativeImage 里的 mvn clean 只清 target/，
+      # 若放到 target/ 会在链接前被删掉。
+      - name: CompileAppIconResource
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Command rc.exe -ErrorAction SilentlyContinue)) {
+            throw 'rc.exe 不在 PATH —— 图标资源无法编译（它随 Windows SDK 提供；请检查 InitMsvcToolchain 是否真的注入了 VS 环境变量）'
+          }
+          if (-not (Test-Path 'exe.rc')) { throw '未找到 exe.rc（程序图标资源脚本）' }
+          if (-not (Test-Path 'exe.ico')) { throw '未找到 exe.ico（程序图标本体）' }
+          rc.exe /nologo /fo exe.res exe.rc
+          if ($LASTEXITCODE -ne 0) { throw "rc.exe 编译失败（退出码 $LASTEXITCODE）—— 看上方 rc 输出定位（常见：exe.ico 损坏 / 不是合法 ICO）" }
+          if (-not (Test-Path 'exe.res')) { throw 'rc.exe 返回成功但没有生成 exe.res' }
+          Write-Host ("自证：图标资源已生成 exe.res（{0} 字节，来自 exe.ico 的 {1} 字节）✅" -f (Get-Item 'exe.res').Length, (Get-Item 'exe.ico').Length)
+
       # profile native-image 内的 compile-no-fork 绑定在 package 阶段：
       # 先正常编译并打出 fat jar（供后续提取 JavaFX 原生 DLL），再产出原生镜像
       - name: BuildNativeImage

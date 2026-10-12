@@ -1,0 +1,14 @@
+/* Application icon resource.
+ *
+ * Compiled by rc.exe into exe.res, then embedded into the exe by the native-image link step
+ * (see pom.xml's -H:NativeLinkerOption and the workflow step CompileAppIconResource).
+ *
+ * Keep this file PURE ASCII on purpose: rc.exe's code page handling for non-ASCII sources depends
+ * on the environment. The rest of the project uses Chinese comments; this file intentionally does not.
+ *
+ * Icon body: exe.ico (single 200x200 PNG-compressed entry).
+ * Provenance: Docs/Asset/README.md
+ */
+#include <windows.h>
+
+IDI_APP_ICON ICON "exe.ico"
