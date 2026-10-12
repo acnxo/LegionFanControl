@@ -87,7 +87,7 @@ java --enable-native-access=ALL-UNNAMED -jar Dist/LegionFanControl.jar
 > [!IMPORTANT]
 > **必须以管理员身份运行**。联想 WMI 提供程序在非管理员上下文下会直接返回「拒绝访问」，转速与温度全部无法读取。
 >
-> 区别在于怎么拿到管理员权限：**`Bootstrap.cmd`（JVM 版）**会在权限不足时自动弹出 UAC 请求提权，无需手动处理；**原生镜像版 exe** 不支持启动时自提升，需右键「以管理员身份运行」（或从已提权的终端启动）。
+> 区别在于怎么拿到管理员权限： **`Bootstrap.cmd`（JVM 版）** 会在权限不足时自动弹出 UAC 请求提权，无需手动处理；**原生镜像版 exe** 不支持启动时自提升，需右键「以管理员身份运行」（或从已提权的终端启动）。
 > 详细说明见 [`Dist/README.md`](Dist/README.md) 的「为什么必须管理员权限」。
 
 ---
