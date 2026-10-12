@@ -13,11 +13,13 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.image.Image;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
+import java.io.InputStream;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -135,6 +137,17 @@ public class FanControlApp extends Application {
         // 宽度 470：容纳「风扇 1 转速（左 / CPU 侧，推测）」这类较长标注而不被截断
         stage.setScene(new Scene(root, 600, 360));
         stage.setTitle("Legion风扇控制 V0.3.1");
+        // 窗口与任务栏图标：与 exe 的文件图标同一张图（见 Docs/Asset/README.md）。
+        // 图标是外观项：缺失或加载失败都不应影响启动，因此只记一行、不向上抛。
+        try (InputStream logo = FanControlApp.class.getResourceAsStream("/Asset/Logo.png")) {
+            if (logo == null) {
+                System.out.println("窗口图标：未找到 Logo.png，已跳过（不影响功能）");
+            } else {
+                stage.getIcons().add(new Image(logo));
+            }
+        } catch (Exception e) {
+            System.out.println("窗口图标：加载失败，已跳过（" + e.getClass().getSimpleName() + "）");
+        }
         stage.setOnCloseRequest(e -> shutdown());
         stage.show();
         // 注：应用内「屏幕字形像素」（Robot 抓屏）已停用 —— 两次真机验证都证明它抓到的**不是本窗口**

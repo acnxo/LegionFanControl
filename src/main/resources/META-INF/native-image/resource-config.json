@@ -1,6 +1,7 @@
 {
   "resources": {
     "includes": [
+      { "pattern": "Asset/.*\\.png$" },
       { "pattern": "javafx.properties" },
       { "pattern": "javafx/.*" },
       { "pattern": "com/sun/javafx/.*" },

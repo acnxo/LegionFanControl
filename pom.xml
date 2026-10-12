@@ -248,6 +248,11 @@
                                 <arg>-H:NativeLinkerOption=/MANIFEST:EMBED</arg>
                                 <arg>-H:NativeLinkerOption=/MANIFESTINPUT:${project.basedir}/exe.manifest</arg>
 
+                                <!-- 程序图标：exe.res 由 rc.exe 编译 exe.rc（引用 exe.ico）得到，
+                                     见工作流的 CompileAppIconResource 步骤；没有它，exe 在资源管理器
+                                     与任务栏里显示为默认白纸图标。exe.res 不入库（构建产物）。 -->
+                                <arg>-H:NativeLinkerOption=${project.basedir}/exe.res</arg>
+
                                 <!-- 以 GUI 子系统链接：**彻底不创建控制台窗口**。
                                      控制台子系统的 exe，双击与右键「以管理员身份运行」都会先弹一个黑框；
                                      “启动后再隐藏”只能事后补救（还要看 FFM 调用与判定是否成立，实测不达标），

@@ -705,6 +705,27 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     > 适用于从命令行启动），否则 `AllocConsole`（新开一个），再用 `CONOUT$` 把 `System.out` / `System.err`
     > 重定向进去。该路径失败只记状态 —— **不影响默认的“无控制台”行为，因为它是链接期定下的，不依赖任何运行时调用**。
 
+19. **原生 exe 的程序图标（2026-10-12）**。
+    目标：exe 在资源管理器 / 任务栏 / 快捷方式里不再是默认白纸图标，应用窗口也用同一张图。
+
+    | 位置 | 做什么 | 怎么做 |
+    |---|---|---|
+    | 版本库 | 存图标源 | `exe.ico`（单条 200×200 **PNG-in-ICO**：6+16 字节 ICO 头 + 原始 PNG 载荷）与 `exe.rc`（**纯 ASCII**，`IDI_APP_ICON ICON "exe.ico"`）入仓库根；`exe.res` 不入库（构建产物，见 `.gitignore`） |
+    | CI（`CompileAppIconResource`） | 编译资源 | `rc.exe /nologo /fo exe.res exe.rc` —— `rc.exe` 随 Windows SDK 提供，`InitMsvcToolchain`（ilammy/msvc-dev-cmd）注入 VS 环境后即在 PATH；失败即报错退出 |
+    | pom（native-image profile） | 嵌入 exe | `-H:NativeLinkerOption=${project.basedir}/exe.res` —— `.res` 作为普通链接输入交给 MSVC 链接器 |
+    | 运行期（`FanControlApp`） | 窗口 / 任务栏图标 | `stage.getIcons().add(new Image(getResourceAsStream("/Asset/Logo.png")))`；`resource-config.json` 必须加 `Asset/.*\\.png$`，否则原生镜像里取不到该资源 |
+    | CI 自证（`CheckExeIcon`） | 确认“真嵌进去了” | 在 exe 字节里找 `exe.ico` 载荷开头 32 字节的签名（资源节按原样存放，命中即证明已嵌入）—— “rc 编译成功”不等于“链接进了 exe” |
+
+    为何 `rc` 这一步不做成“宽容”：pom 的链接参数是**无条件**引用的 —— `exe.res` 缺失会直接让链接失败；
+    与其让下游报一句难懂的 link error，不如在 `CompileAppIconResource` 里给出可照做的提示。
+
+    为何 `exe.res` 必须写在仓库根（不能放 `target/`）：构建命令是 `mvn ... clean package`，`clean` 只清 `target/`，
+    放进里面会在链接前就被删掉。
+
+    为何 `exe.rc` 用英文注释：`rc.exe` 对非 ASCII 源文件的代码页处理依赖环境，纯 ASCII 最稳（本仓库其余文件仍用中文注释）。
+
+    图标的用途与替换步骤见 `Docs/Asset/README.md`。
+
 ---
 
 ## 6. 排查手册
