@@ -19,7 +19,7 @@
 
 ## 界面说明
 
-![界面截图（占位，待补充）](Docs/Asset/IMG/UI-Main.png)
+![界面截图](Docs/Asset/IMG/UI-Main.png)
 
 > 各显示项、按钮状态与读数约定的完整说明见 [`Docs/UserInterface.md`](Docs/UserInterface.md)。
 

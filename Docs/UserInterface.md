@@ -6,7 +6,7 @@
 
 ![界面截图](Asset/IMG/UI-Main.png)
 
-> 当前为占位图。替换时只需用真实截图覆盖 `Docs/Asset/IMG/UI-Main.png`，**无需改动任何 Markdown**。
+> 更换截图时只需覆盖 `Docs/Asset/IMG/UI-Main.png`，**无需改动任何 Markdown**。
 
 ---
 
