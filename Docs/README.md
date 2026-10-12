@@ -15,7 +15,7 @@ Docs/
 ├── ProjectStructure.md           项目结构（项目概况 / 目录职责 / 构建机制）
 ├── LimitationsAndRoadmap.md      已知限制与路线图（能力边界 / 待办）
 ├── NativeImageCi.md              原生镜像 CI 与发布（触发 / 工具链 / tag 规则 / 踩坑）
-├── TroubleShooting/              故障档案与修复跟踪（TS-2610-001 文本渲染退化 / TS-2610-002 .cmd 行尾解析漂移）
+├── TroubleShooting/              故障档案与修复跟踪（TS-2610-001 文本渲染退化 / TS-2610-002 .cmd 行尾解析漂移 / TS-2610-003 FXML 原生包反射与资源排除）
 ├── DevSpec/                      开发规范（文档命名与格式规范）
 ├── DevLog/                       开发过程日志（内部工作记忆脱敏导出，append-only）
 └── Asset/                        文档配图
@@ -34,7 +34,7 @@ Docs/
 | [ProjectStructure.md](ProjectStructure.md) | **项目结构** —— **项目概况**（目标机型 / 技术栈 / 交付形态 / 许可证）、完整目录树与各目录职责、**从源码构建**与打包机制（shade 合并 + 自动导出 `Dist/`）、**原生镜像构建**（GraalVM native image / CI）、产物名与版本管理说明 | 刚接手项目；不确定东西该放哪个目录 |
 | [LimitationsAndRoadmap.md](LimitationsAndRoadmap.md) | **已知限制与路线图** —— 四项能力边界的展开说明（如为何不支持单风扇定向控制）、后续待办 T1–T4 | 评估「某功能能不能做」；规划下一步 |
 | [NativeImageCi.md](NativeImageCi.md) | **原生镜像 CI 与发布** —— 触发方式与作业图、编译工具链（GraalVM / MSVC / Maven）、各步骤为何这么写、产物形态、tag 与 Release 发布规则、P0 踩坑、排查手册 | 改这个工作流之前；排查原生编译或发布失败 |
-| [TroubleShooting/](TroubleShooting/) | **故障档案与修复跟踪** —— TS-2610-001：原生包文本渲染退化（GraalVM native-image 下 LCD 次像素文本合成）的现象、证据分层、已限定代码范围、本仓库缓解措施的开关与回退、**上游 issue 的修复进展与待办**；<br>TS-2610-002：`.cmd` 退化成 LF 行尾导致 cmd.exe **行读取位置漂移**（含中文的批处理被错误切分）—— 字节级取证、`.gitattributes` + CI 自证的机器兜底、已下载旧包的就地修复。<br>**命名与格式见 [DevSpec/TroubleShootingDocSpec.md](DevSpec/TroubleShootingDocSpec.md)** | 想了解这两个缺陷查到了哪一步；改脚本行尾 / 换编辑器 / 批量改写 `.cmd` 之前 |
+| [TroubleShooting/](TroubleShooting/) | **故障档案与修复跟踪** —— TS-2610-001：原生包文本渲染退化（GraalVM native-image 下 LCD 次像素文本合成）的现象、证据分层、已限定代码范围、本仓库缓解措施的开关与回退、**上游 issue 的修复进展与待办**；<br>TS-2610-003：FXML 界面重构后**原生包启动即崩**（构建全绿、运行即死）—— 两层根因：FXML 反射要按**声明类**登记、资源规则过宽把 `Trampoline.class` 当资源编进镜像诱发运行期 `defineClass`；含三条被证伪路线与最小复现实验。<br>**命名与格式见 [DevSpec/TroubleShootingDocSpec.md](DevSpec/TroubleShootingDocSpec.md)** | 想了解这两个缺陷查到了哪一步；改脚本行尾 / 换编辑器 / 批量改写 `.cmd` 之前 |
 | [DevSpec/](DevSpec/) | **开发规范** —— [TroubleShooting 文档命名与格式规范](DevSpec/TroubleShootingDocSpec.md)：TS 档案的文件名结构（`TS-<yyMM>-<序号>-<英文词序>`）、**一个单词一个单词用 `-` 连接（禁止连写；`LCD`/`CMD`/`JVM`/`CRLF` 等缩写全大写）**、非 TS 文档用大驼峰（`TroubleShootingDocSpec.md`）、正文骨架与各节要求、结论分层与证据写法、重命名操作流程、提交前自查清单 | **新建或重命名故障档案之前——必读**；整理文档结构时 |
 
 ---
