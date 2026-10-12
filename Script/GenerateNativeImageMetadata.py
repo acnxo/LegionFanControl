@@ -155,6 +155,11 @@ FXML_UI_CLASSES = (
     # FXML 属性里的枚举：alignment="CENTER" → Pos.valueOf，hgrow="ALWAYS" → Priority.valueOf
     "javafx.geometry.Pos",
     "javafx.scene.layout.Priority",
+    # FXMLLoader 解析 fxml 走 StAX：javax.xml.stream.XMLInputFactory.newInstance() 会用
+    # Class.forName 找 JDK 内部实现（FactoryFinder），该实现必须登记才进镜像，
+    # 否则报 javax.xml.stream.FactoryConfigurationError: Provider … not found
+    # （2026-10-12 实测，见 Docs/NativeImageCi.md 第 5 节第 21 条）。
+    "com.sun.xml.internal.stream.XMLInputFactoryImpl",
 )
 
 # fx:controller 指定的控制器：FXML 反射注入 @FXML 字段、反射调用 onAction 方法

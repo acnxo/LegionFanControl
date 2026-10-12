@@ -2421,6 +2421,13 @@
     "allDeclaredFields": true
   },
   {
+    "name": "com.sun.xml.internal.stream.XMLInputFactoryImpl",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "io.github.acnxo.legion.fan.FanControlApp",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true
