@@ -139,7 +139,7 @@ public class FanControlApp extends Application {
         stage.setTitle("Legion风扇控制 V0.3.1");
         // 窗口与任务栏图标：与 exe 的文件图标同一张图（见 Docs/Asset/README.md）。
         // 图标是外观项：缺失或加载失败都不应影响启动，因此只记一行、不向上抛。
-        try (InputStream logo = FanControlApp.class.getResourceAsStream("/io/github/acnxo/legion/fan/Logo.png")) {
+        try (InputStream logo = FanControlApp.class.getResourceAsStream("/Asset/Logo.png")) {
             if (logo == null) {
                 System.out.println("窗口图标：未找到 Logo.png，已跳过（不影响功能）");
             } else {

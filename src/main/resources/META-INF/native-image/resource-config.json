@@ -1,7 +1,7 @@
 {
   "resources": {
     "includes": [
-      { "pattern": "io/github/acnxo/legion/fan/.*\\.png$" },
+      { "pattern": "Asset/.*\\.png$" },
       { "pattern": "javafx.properties" },
       { "pattern": "javafx/.*" },
       { "pattern": "com/sun/javafx/.*" },

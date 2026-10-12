@@ -56,7 +56,7 @@
 │   │       ├── PowerShellWmiBridge.java       PowerShell 桥接实现（当前基线）
 │   │       ├── JnaComWmiBridge.java           JNA/COM 实现（桩，已后置）
 │   │       └── WmiException.java
-│   ├── resources/io/github/acnxo/legion/fan/Logo.png   窗口 / 任务栏图标（JavaFX；原生镜像由 resource-config 收录）
+│   ├── resources/Asset/Logo.png         窗口 / 任务栏图标（JavaFX；原生镜像由 resource-config 收录）
 │   └── resources/META-INF/native-image/ native-image 配置（反射 / JNI / 资源，类路径自动发现）
 ├── Probe/                       开发期探查与辅助工具（不参与打包）
 │   ├── README.md                    各探查脚本与工具逐一说明（含硬件影响标注）
