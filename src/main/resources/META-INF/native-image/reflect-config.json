@@ -2517,6 +2517,13 @@
     "allDeclaredFields": true
   },
   {
+    "name": "javafx.event.EventHandler",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
     "name": "javafx.fxml.FXML",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
@@ -2619,6 +2626,13 @@
   },
   {
     "name": "javafx.scene.control.Button",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredClasses": true
+  },
+  {
+    "name": "javafx.scene.control.ButtonBase",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true,

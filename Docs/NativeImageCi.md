@@ -738,6 +738,11 @@ PR 反查走 `gh api repos/<owner>/<repo>/commits/<sha>/pulls`。**squash 合并
     | fxml / css 资源 | `resource-config.json` 里的 `io/github/acnxo/legion/fan/.*\\.fxml$` 与 `.*\\.css$` | 运行期 `getResource` 为 null ⇒ 「界面加载失败」 |
     | 控制器 + FXML 用到的控件 / 布局类 + **FXMLLoader 自身** | `reflect-config.json`（生成器里的 `FXML_UI_CLASSES` / `CONTROLLER_CLASS`） | FXMLLoader 按类名实例化 / 注入 `@FXML` 字段失败 ⇒ 「界面加载失败」 |
 
+    > **规则（两次实测总结）**：FXML 反射访问成员时按**声明类**解析 —— 属性 `maxWidth` 声明在
+    > `Region`、`text`/`wrapText` 在 `Labeled`、`setOnAction` 在 `ButtonBase`、`getChildren` 在 `Parent`/`Pane`。
+    > 因此「FXML 里出现的每个属性」对应的**声明类**都必须 `allDeclared*`；给子类（`Button`/`HBox`）登记
+    > **不能**覆盖父类的成员。
+    >
     > **实测踩到的第二处（2026-10-12）**：FXML 处理 `<children>` 时反射调用的是
     > `javafx.scene.layout.Pane.getChildren()` —— 而 `HBox` 虽已 `allDeclared*`，**继承来的方法
     > 是按父类解析的**，父类条目不会被子类条目覆盖 ⇒ 报 `MissingReflectionRegistrationError:

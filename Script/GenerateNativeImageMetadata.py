@@ -139,6 +139,11 @@ FXML_UI_CLASSES = (
     "javafx.fxml.FXMLLoader",
     "javafx.fxml.FXML",
     "javafx.scene.control.Label",
+    # setOnAction 声明在 ButtonBase（Button 的父类）上，FXML 绑定 onAction 时按它解析。
+    # 2026-10-12 实测：只登记 Button ⇒ MissingReflectionRegistrationError: ButtonBase.setOnAction。
+    "javafx.scene.control.ButtonBase",
+    # onAction 的形参类型（事件处理器的接口）。
+    "javafx.event.EventHandler",
     "javafx.scene.control.Button",
     "javafx.scene.layout.GridPane",
     "javafx.scene.layout.HBox",
